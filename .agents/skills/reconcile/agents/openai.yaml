@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reconcile Journal"
+  short_description: "Repair clear journal integrity issues safely"
+  default_prompt: "Use $reconcile to report and safely repair clear journal integrity issues."

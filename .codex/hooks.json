@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'd=\"$PWD\"; while [ \"$d\" != / ] && [ ! -f \"$d/.agents/adapters/shared/journal-hook.js\" ]; do d=\"$(dirname \"$d\")\"; done; [ -f \"$d/.agents/adapters/shared/journal-hook.js\" ] || exit 0; exec node \"$d/.agents/adapters/shared/journal-hook.js\" --harness codex'",
+            "timeout": 10,
+            "statusMessage": "Loading journal workflow"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'd=\"$PWD\"; while [ \"$d\" != / ] && [ ! -f \"$d/.agents/adapters/shared/journal-hook.js\" ]; do d=\"$(dirname \"$d\")\"; done; [ -f \"$d/.agents/adapters/shared/journal-hook.js\" ] || exit 0; exec node \"$d/.agents/adapters/shared/journal-hook.js\" --harness codex'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'd=\"$PWD\"; while [ \"$d\" != / ] && [ ! -f \"$d/.agents/adapters/shared/journal-hook.js\" ]; do d=\"$(dirname \"$d\")\"; done; [ -f \"$d/.agents/adapters/shared/journal-hook.js\" ] || exit 0; exec node \"$d/.agents/adapters/shared/journal-hook.js\" --harness codex'",
+            "timeout": 10,
+            "statusMessage": "Checking journal closure"
+          }
+        ]
+      }
+    ]
+  }
+}

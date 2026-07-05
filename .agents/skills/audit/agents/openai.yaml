@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Journal"
+  short_description: "Report journal integrity issues without changes"
+  default_prompt: "Use $audit to inspect the active journal work item and report integrity issues."

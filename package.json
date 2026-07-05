@@ -1,0 +1,27 @@
+{
+  "name": "filesystem-journal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Project-local filesystem journal and agent harness integration",
+  "type": "commonjs",
+  "bin": {
+    "journal": "bin/journal.js"
+  },
+  "files": [
+    ".agents/",
+    ".claude/",
+    ".codex/",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "bin/",
+    "install.sh",
+    "lib/",
+    "spec.md"
+  ],
+  "scripts": {
+    "test": "node tests/journal-hook.test.js && node tests/installer/installer.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

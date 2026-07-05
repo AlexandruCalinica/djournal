@@ -1,0 +1,4 @@
+interface:
+  display_name: "Journal Workflow"
+  short_description: "Coordinate default-on filesystem journaling"
+  default_prompt: "Use $journal-workflow to classify and close this work consistently."

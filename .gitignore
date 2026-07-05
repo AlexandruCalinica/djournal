@@ -1,0 +1,22 @@
+# Local journal history and runtime state
+.journal/
+
+# Node dependencies and test output
+node_modules/
+coverage/
+
+# Package artifacts and logs
+*.tgz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
