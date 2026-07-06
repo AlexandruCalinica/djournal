@@ -23,6 +23,8 @@ const {
 const {
   BEGIN,
   END,
+  LEGACY_BEGIN,
+  LEGACY_END,
   mergeHookConfig,
   removeHookConfig,
   removeManagedBlock,
@@ -54,6 +56,16 @@ test("managed Markdown blocks update and remove without replacing surrounding te
   assert.doesNotMatch(updated, /Journal v1/);
   assert.match(updated, /Journal v2/);
   assert.equal(removeManagedBlock(updated).text, original);
+});
+
+test("legacy managed Markdown blocks migrate without duplicating surrounding content", () => {
+  const original = "# Existing\n\nKeep this.\n";
+  const legacy = `${original}\n${LEGACY_BEGIN}\nLegacy instructions\n${LEGACY_END}\n`;
+  const migrated = upsertManagedBlock(legacy, "djournal instructions");
+  assert.equal(count(migrated, BEGIN), 1);
+  assert.equal(count(migrated, LEGACY_BEGIN), 0);
+  assert.match(migrated, /Keep this/);
+  assert.equal(removeManagedBlock(migrated).text, original);
 });
 
 test("hook fragments merge idempotently and remove only injected groups", () => {
@@ -154,6 +166,48 @@ test("both-harness install is idempotent and partial/full uninstall preserves us
   assert.equal(read(root, ".journal/work/example/work.md"), "history\n");
   assert.deepEqual(json(root, ".journal/state.json"), { active_work_name: "example" });
   assert.equal(fs.existsSync(path.join(root, MANIFEST_PATH)), false);
+});
+
+test("upgrade and uninstall preserve user edits outside managed instruction blocks", async () => {
+  const root = target();
+  fs.writeFileSync(path.join(root, "AGENTS.md"), "# Existing agents\n\nOriginal agent guidance.\n");
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), "# Existing Claude\n\nOriginal Claude guidance.\n");
+
+  const options = { sourceRoot, target: root, harnesses: ["codex", "claude-code"], interactive: false };
+  await install(options);
+
+  const editedAgents = `# Added after install\n\n${read(root, "AGENTS.md")}\nAgent footer added after install.\n`;
+  const editedClaude = `# Added after install\n\n${read(root, "CLAUDE.md")}\nClaude footer added after install.\n`;
+  fs.writeFileSync(path.join(root, "AGENTS.md"), editedAgents);
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), editedClaude);
+  const expectedAgents = removeManagedBlock(editedAgents).text;
+  const expectedClaude = removeManagedBlock(editedClaude).text;
+
+  await upgrade({ sourceRoot, target: root, interactive: false });
+  assert.match(read(root, "AGENTS.md"), /Added after install/);
+  assert.match(read(root, "AGENTS.md"), /Agent footer added after install/);
+  assert.match(read(root, "CLAUDE.md"), /Added after install/);
+  assert.match(read(root, "CLAUDE.md"), /Claude footer added after install/);
+  assert.equal(count(read(root, "AGENTS.md"), BEGIN), 1);
+  assert.equal(count(read(root, "CLAUDE.md"), BEGIN), 1);
+
+  uninstall({ target: root });
+  assert.equal(read(root, "AGENTS.md"), expectedAgents);
+  assert.equal(read(root, "CLAUDE.md"), expectedClaude);
+});
+
+test("upgrade refuses a corrupted managed instruction block without rewriting the file", async () => {
+  const root = target();
+  fs.writeFileSync(path.join(root, "AGENTS.md"), "# Existing\n\nKeep this content.\n");
+  await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
+  const corrupted = read(root, "AGENTS.md").replace(END, "<!-- boundary removed -->");
+  fs.writeFileSync(path.join(root, "AGENTS.md"), corrupted);
+
+  await assert.rejects(
+    upgrade({ sourceRoot, target: root, interactive: false }),
+    (error) => error instanceof InstallerError && error.code === "ASSET_CONFLICT",
+  );
+  assert.equal(read(root, "AGENTS.md"), corrupted);
 });
 
 test("instructions-only dry-run makes no changes", async () => {

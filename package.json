@@ -1,10 +1,10 @@
 {
-  "name": "filesystem-journal",
+  "name": "djournal",
   "version": "0.1.0",
-  "private": true,
-  "description": "Project-local filesystem journal and agent harness integration",
+  "description": "Durable project memory for coding agents, stored as linked Markdown",
   "type": "commonjs",
   "bin": {
+    "djournal": "bin/journal.js",
     "journal": "bin/journal.js"
   },
   "files": [
@@ -19,7 +19,27 @@
     "spec.md"
   ],
   "scripts": {
-    "test": "node tests/journal-hook.test.js && node tests/installer/installer.test.js"
+    "test": "node tests/journal-hook.test.js && node tests/installer/installer.test.js",
+    "prepublishOnly": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexandruCalinica/djournal.git"
+  },
+  "homepage": "https://github.com/AlexandruCalinica/djournal#readme",
+  "bugs": {
+    "url": "https://github.com/AlexandruCalinica/djournal/issues"
+  },
+  "keywords": [
+    "ai-agents",
+    "coding-agents",
+    "developer-tools",
+    "journal",
+    "markdown",
+    "project-memory"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18"

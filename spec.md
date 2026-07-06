@@ -1,4 +1,4 @@
-# Atlas Filesystem Journal Specification
+# djournal Specification
 
 **Version**: 1
 **Date**: 2026-06-30
@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-Atlas Journal is a local, filesystem-based memory system for agent-driven work.
+djournal is a local, Markdown-based memory system for agent-driven work.
 Markdown and YAML frontmatter are the source of truth. Agent skills create,
 retrieve, audit, and reconcile that memory without a database, server, daemon,
 sync service, or web UI.

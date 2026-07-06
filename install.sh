@@ -3,13 +3,13 @@
 set -eu
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "filesystem journal requires Node 18 or newer" >&2
+  echo "djournal requires Node 18 or newer" >&2
   exit 1
 fi
 
 major=$(node -p 'process.versions.node.split(".")[0]')
 if [ "$major" -lt 18 ]; then
-  echo "filesystem journal requires Node 18 or newer" >&2
+  echo "djournal requires Node 18 or newer" >&2
   exit 1
 fi
 
@@ -20,7 +20,7 @@ else
 fi
 
 if [ ! -f "$source_dir/bin/journal.js" ]; then
-  echo "journal source not found; set JOURNAL_SOURCE_DIR to an unpacked release or source checkout" >&2
+  echo "djournal source not found; set JOURNAL_SOURCE_DIR to an unpacked release or source checkout" >&2
   exit 1
 fi
 

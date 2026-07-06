@@ -1,15 +1,15 @@
-# Journal
+# djournal
 
 Durable project memory for coding agents, readable by humans.
 
-Journal records the path of the work—plans, research, decisions, changes, and
+djournal records the path of the work—plans, research, decisions, changes, and
 next steps—as linked Markdown inside your project. Codex and Claude Code can use
 that memory automatically across sessions without a database, account, or
 proprietary service.
 
 > **Files are memory. Indexes are projections.**
 
-## Why Journal exists
+## Why djournal exists
 
 Code preserves what a system does. It rarely preserves why it became that way,
 what was tried, which evidence mattered, or what should happen next.
@@ -18,7 +18,7 @@ Chat transcripts preserve too much. Conventional documentation is usually
 written too late. Retrieval systems can find fragments, but they cannot recover
 reasoning that was never recorded.
 
-Journal makes project memory part of doing the work. Skills capture durable
+djournal makes project memory part of doing the work. Skills capture durable
 context when work becomes meaningful; optional hooks make the workflow
 default-on without writing entries behind the agent's back.
 
@@ -47,7 +47,7 @@ links turn the directory into an explicit graph.
 Google Cloud's draft [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/)
 formalizes the same broad pattern: knowledge as linked Markdown with YAML
 frontmatter, portable through Git and independent of the tools that produce or
-consume it. Journal is conceptually aligned with that direction, but uses a
+consume it. djournal is conceptually aligned with that direction, but uses a
 domain-specific schema for project history and is not currently
 [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
 conformant.
@@ -59,17 +59,17 @@ They are not ideal as the only durable copy of project memory.
 
 | Layer | What it provides |
 | --- | --- |
-| Journal Markdown | Canonical meaning, provenance, chronology, and links |
+| djournal Markdown | Canonical meaning, provenance, chronology, and links |
 | Git | Review, attribution, history, and team exchange |
 | Embeddings / RAG | Semantic retrieval over larger corpora |
 | Graph projection | Traversal, visualization, and multi-hop retrieval |
 
 Vector and graph indexes are derived representations: they require ingestion,
-can become stale, and may change with the model or extraction pipeline. Journal
+can become stale, and may change with the model or extraction pipeline. djournal
 keeps the authored source inspectable and lets those indexes be rebuilt when
 needed. It complements retrieval infrastructure rather than replacing it.
 
-## What Journal records
+## What djournal records
 
 ```text
 .journal/
@@ -90,7 +90,7 @@ and typed links. Markdown remains the source of truth.
 ```mermaid
 flowchart LR
     R[Request] --> A[Coding agent]
-    A --> W[Journal workflow]
+    A --> W[djournal workflow]
     W --> M[Read project memory]
     W --> X[Plan / research / decide]
     W --> C[Complete meaningful work]
@@ -107,18 +107,19 @@ flowchart LR
 
 ## Install
 
-Requires Node.js 18 or newer. From this repository checkout:
+Requires Node.js 18 or newer. Run this from the project you want to equip:
 
 ```bash
-./install.sh install --target /path/to/project
+npx djournal install
 ```
 
-The installer detects Codex or Claude Code. Select explicitly when needed:
+The installer targets the current directory and detects Codex or Claude Code.
+Select explicitly when needed:
 
 ```bash
-./install.sh install --target /path/to/project --harness codex
-./install.sh install --target /path/to/project --harness claude-code
-./install.sh install --target /path/to/project --all
+npx djournal install --harness codex
+npx djournal install --harness claude-code
+npx djournal install --all
 ```
 
 Then use your coding agent normally.
@@ -126,15 +127,19 @@ Then use your coding agent normally.
 ## Lifecycle
 
 ```bash
-./install.sh status --target /path/to/project
-./install.sh doctor --target /path/to/project
-./install.sh upgrade --target /path/to/project
-./install.sh uninstall --target /path/to/project
+npx djournal status
+npx djournal doctor
+npx djournal upgrade
+npx djournal uninstall
 ```
 
 Installation preserves existing agent configuration. Uninstallation removes
-Journal's tooling while retaining `.journal/` so the project memory can be
+djournal's tooling while retaining `.journal/` so the project memory can be
 revived later.
+
+Existing `AGENTS.md` and `CLAUDE.md` files are never replaced. djournal adds an
+owned block, updates only that block, and removes only that block during
+uninstall; surrounding project instructions remain untouched.
 
 See [spec.md](spec.md) for the complete data model and workflow contracts.
 

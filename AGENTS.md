@@ -1,4 +1,4 @@
-# Filesystem Journal Workflow
+# djournal Workflow
 
 This repository uses `.journal/` as durable project memory and `.agents/` as
 the journal's rules and skills. Markdown is the source of truth.
