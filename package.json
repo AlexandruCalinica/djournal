@@ -13,13 +13,17 @@
     ".codex/",
     "AGENTS.md",
     "CLAUDE.md",
+    "LICENSE",
     "bin/",
     "install.sh",
     "lib/",
     "spec.md"
   ],
   "scripts": {
-    "test": "node tests/journal-hook.test.js && node tests/installer/installer.test.js",
+    "check:package": "node scripts/check-package.cjs",
+    "check:pr-title": "node scripts/check-pr-title.js",
+    "release": "semantic-release",
+    "test": "node tests/journal-hook.test.js && node tests/installer/installer.test.js && node tests/release-policy.test.js && npm run check:package",
     "prepublishOnly": "npm test"
   },
   "repository": {
@@ -38,10 +42,14 @@
     "markdown",
     "project-memory"
   ],
+  "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "semantic-release": "25.0.3"
   }
 }

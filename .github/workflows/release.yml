@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: djournal-production-release
+  queue: max
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || vars.RELEASE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm test
+      - run: npm pack --dry-run --ignore-scripts
+      - name: Verify release calculation without publishing
+        if: github.event_name == 'workflow_dispatch'
+        run: npm run release -- --dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish npm package and GitHub release
+        if: github.event_name == 'push' && vars.RELEASE_ENABLED == 'true'
+        run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
