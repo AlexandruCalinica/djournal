@@ -146,3 +146,13 @@ See [spec.md](spec.md) for the complete data model and workflow contracts.
 ## Status
 
 Codex and Claude Code are supported. OpenCode, Pi, and Zed adapters are planned.
+
+## Contributing and releases
+
+Pull request titles use Conventional Commit form, such as
+`feat(installer): support zed` or `fix: preserve existing hooks`. Merges to
+`main` are released automatically after the initial npm/OIDC bootstrap. Before
+1.0, breaking changes increment the minor version; from 1.0 onward they
+increment the major version.
+
+djournal is licensed under the [Apache License 2.0](LICENSE).
