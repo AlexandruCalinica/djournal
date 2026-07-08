@@ -15,6 +15,7 @@
     "CLAUDE.md",
     "LICENSE",
     "bin/",
+    "docs/",
     "install.sh",
     "lib/",
     "spec.md"

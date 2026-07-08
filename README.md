@@ -161,16 +161,24 @@ tokens can hold more text; the agent still needs to know what matters.
 Requires Node.js 18 or newer. Run this from the project you want to equip:
 
 ```bash
-npx djournal install
+npm install -g djournal
+djournal install
 ```
 
-The installer targets the current directory and detects Codex or Claude Code.
-Select explicitly when needed:
+The global install gives you the `djournal` and `journal` commands. The
+installer targets the current directory and detects Codex or Claude Code. Select
+explicitly when needed:
 
 ```bash
-npx djournal install --harness codex
-npx djournal install --harness claude-code
-npx djournal install --all
+djournal install --harness codex
+djournal install --harness claude-code
+djournal install --all
+```
+
+If you do not want a global install, use `npx`:
+
+```bash
+npx djournal install
 ```
 
 Then use your coding agent normally.
@@ -214,3 +222,12 @@ Pull request titles use Conventional Commit form, such as
 increment the major version.
 
 djournal is licensed under the [Apache License 2.0](LICENSE).
+
+## Documentation
+
+- [Installation and repository layouts](docs/installation.md)
+- [Remote Git sync setup](docs/remote-sync.md)
+- [Architecture and data model](docs/architecture.md)
+- [Visibility and sharing](docs/visibility-and-sharing.md)
+- [Djournal in practice](docs/djournal-in-practice.md)
+- [Uninstalling and reinstalling](docs/uninstalling.md)
