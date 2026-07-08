@@ -1,9 +1,14 @@
 # Remote Git Sync Setup
 
 Git-backed sharing lets a team move journal history through the same reviewable
-transport they use for code. The current sync behavior is intentionally
-conservative: local-only work is skipped, shared work is synchronized through
-Git, and unresolved conflicts stop the operation.
+transport they use for code. There are two different modes:
+
+- colocated `.journal/` in a product repository
+- standalone journal repository for multi-repo or team-wide memory
+
+The `djournal sync` command is opt-in and intended for standalone journal
+repositories. In colocated mode, normal product repository commits already carry
+the journal, so `djournal sync` should be disabled or skipped.
 
 ## Colocated repository
 
@@ -18,8 +23,18 @@ git commit -m "chore: install djournal"
 git push origin main
 ```
 
-Only share journal work that is safe for the team to see. Do not commit
-local-only work items unless they are intentionally promoted.
+Only share journal work that is safe for the team to see. In colocated mode,
+Git decides what is shared: if `.journal/` is tracked, journal files travel
+with ordinary commits. Work item visibility is still useful as a human/agent
+signal, but it does not stop Git from committing files that are already tracked.
+
+If `.journal/` or `.journal/work/...` is ignored, `djournal share` can promote
+the work item but Git will not include it unless you update `.gitignore` or
+force-add the intended path:
+
+```bash
+git add -f .journal/work/2026-07-03-01-example
+```
 
 ## Standalone journal repository
 
@@ -39,6 +54,21 @@ git push -u origin main
 Keep the repository next to the code repositories and let agents run from the
 journal repository when they need durable memory across the whole product.
 
+Enable standalone sync explicitly:
+
+```bash
+mkdir -p .journal
+cat > .journal/config.json <<'JSON'
+{
+  "sync": {
+    "enabled": true,
+    "mode": "standalone",
+    "auto": true
+  }
+}
+JSON
+```
+
 ## Bootstrapping from an existing remote
 
 When the journal remote already exists:
@@ -52,6 +82,10 @@ djournal status
 
 If `.journal/` is already present after clone, the install step refreshes local
 harness integration without replacing durable journal history.
+
+If the remote was created for standalone journal sync, verify or add
+`.journal/config.json` with `sync.enabled: true`, `sync.mode: "standalone"`,
+and `sync.auto: true` before expecting hooks to synchronize automatically.
 
 ## Sharing a work item
 
@@ -88,14 +122,17 @@ djournal sync --work 2026-07-03-01-git-backed-journal-collaboration
 
 Current behavior:
 
+- sync is skipped unless `.journal/config.json` opts in
+- colocated mode is skipped
 - local-only work is skipped
 - shared work requires `.journal/` to be inside a Git work tree
 - unresolved journal conflicts stop sync
 - sync uses conservative Git operations to pull, add, commit, and push journal
   changes
 
-Hook-triggered sync uses the same command path with `--auto` after a valid
-closed journal marker for team-shared work.
+Hook-triggered sync uses the same command path with `--auto` only when
+`.journal/config.json` enables standalone automatic sync and the closed work is
+team-shared.
 
 ## Keep local state local
 

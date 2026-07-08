@@ -56,6 +56,22 @@ function activeWork(root) {
   }
 }
 
+function readSyncConfig(root) {
+  try {
+    const file = path.join(root, ".journal", "config.json");
+    if (!fs.existsSync(file)) return {};
+    const config = JSON.parse(fs.readFileSync(file, "utf8"));
+    return config.sync && typeof config.sync === "object" ? config.sync : {};
+  } catch {
+    return {};
+  }
+}
+
+function shouldAutoSync(root) {
+  const config = readSyncConfig(root);
+  return config.enabled === true && config.auto === true && config.mode === "standalone";
+}
+
 function context(event, message) {
   return {
     hookSpecificOutput: {
@@ -132,7 +148,7 @@ function handle(payload, options = {}) {
   }
   if (match[1].toLowerCase() === "closed") {
     const work = activeWork(root);
-    if (work?.visibility === "team_shared") {
+    if (work?.visibility === "team_shared" && shouldAutoSync(root)) {
       const result = syncSharedWork(root, work, options.syncRunner);
       if (!result.ok) {
         return context(event, `Journal entry is closed and work is team_shared, but automatic journal sync failed: ${result.message}`);
@@ -158,4 +174,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { handle, parseFrontmatter };
+module.exports = { handle, parseFrontmatter, shouldAutoSync };

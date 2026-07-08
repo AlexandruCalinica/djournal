@@ -7,6 +7,7 @@ RAG systems, graph views, and model context are projections over that source.
 
 ```text
 .journal/
+  config.json
   state.json
   work/<work-item>/
     work.md
@@ -29,6 +30,25 @@ Every work item has:
 
 The frontmatter stores stable identity, title, status, visibility, authorship,
 and timestamps.
+
+## Configuration
+
+`.journal/config.json` stores repository-level journal behavior. Sync is
+disabled unless configuration opts in:
+
+```json
+{
+  "sync": {
+    "enabled": true,
+    "mode": "standalone",
+    "auto": true
+  }
+}
+```
+
+Use `mode: "standalone"` for a dedicated journal repository. Use
+`mode: "colocated"` or omit sync configuration when `.journal/` is committed
+with a product repository and normal Git commits carry journal history.
 
 ## Entry types
 

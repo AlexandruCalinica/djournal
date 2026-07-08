@@ -33,8 +33,9 @@ Dry run:
 djournal share --dry-run --json
 ```
 
-`share` changes visibility. It does not by itself guarantee remote publication;
-Git transport is handled by `sync`.
+`share` changes visibility. It does not by itself guarantee remote publication.
+In colocated repositories, Git publication is whatever normal commits include.
+In standalone journal repositories, Git transport is handled by opt-in `sync`.
 
 ## Sync and visibility
 
@@ -54,8 +55,9 @@ If the selected work item is `local_only`, sync skips it:
 }
 ```
 
-For `team_shared` work, sync performs conservative Git operations for journal
-changes and stops on unresolved journal conflicts.
+For `team_shared` work, sync performs conservative Git operations only when
+`.journal/config.json` explicitly enables standalone sync. In colocated mode,
+sync is skipped because normal repository commits already carry the journal.
 
 ## Safety model
 

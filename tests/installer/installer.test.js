@@ -117,7 +117,7 @@ test("CLI parsing accepts share and sync work selection", () => {
   assert.equal(syncOptions.auto, true);
 });
 
-test("share promotes active work visibility and sync skips local-only work", () => {
+test("sync is opt-in and share promotes active work visibility", () => {
   const root = target();
   fs.mkdirSync(path.join(root, ".journal/work/2026-07-01-01-demo"), { recursive: true });
   fs.writeFileSync(path.join(root, ".journal/state.json"), JSON.stringify({ active_work_name: "2026-07-01-01-demo" }));
@@ -135,9 +135,19 @@ test("share promotes active work visibility and sync skips local-only work", () 
     "",
   ].join("\n"));
 
-  const skipped = sync({ target: root });
-  assert.equal(skipped.skipped, true);
-  assert.equal(skipped.reason, "visibility is local_only");
+  const disabled = sync({ target: root });
+  assert.equal(disabled.skipped, true);
+  assert.equal(disabled.reason, "sync is not enabled");
+
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "colocated" } }));
+  const colocated = sync({ target: root });
+  assert.equal(colocated.skipped, true);
+  assert.equal(colocated.reason, "sync mode is colocated");
+
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone" } }));
+  const localOnly = sync({ target: root });
+  assert.equal(localOnly.skipped, true);
+  assert.equal(localOnly.reason, "visibility is local_only");
 
   const result = share({ target: root });
   assert.equal(result.changed, true);
