@@ -180,6 +180,8 @@ Then use your coding agent normally.
 ```bash
 npx djournal status
 npx djournal doctor
+npx djournal share
+npx djournal sync
 npx djournal upgrade
 npx djournal uninstall
 ```
@@ -192,12 +194,16 @@ Existing `AGENTS.md` and `CLAUDE.md` files are never replaced. djournal adds an
 owned block, updates only that block, and removes only that block during
 uninstall; surrounding project instructions remain untouched.
 
+`share` promotes the active work item to shared visibility. `sync` performs the
+conservative Git-backed exchange for shared work. Local-only work is skipped by
+sync.
+
 ## Status
 
 Codex and Claude Code are supported. OpenCode, Pi, and Zed adapters are planned.
 
-Git-backed sharing and automatic sync are being designed and implemented
-conservatively so local-only work remains private by default.
+Git-backed sharing and automatic sync are being implemented conservatively so
+local-only work remains private by default.
 
 ## Contributing and releases
 

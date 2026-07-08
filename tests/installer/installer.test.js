@@ -15,7 +15,9 @@ const {
   install,
   loadManifest,
   selectHarnesses,
+  share,
   sourceInventory,
+  sync,
   status,
   uninstall,
   upgrade,
@@ -100,6 +102,47 @@ test("CLI parsing accepts multi-harness and lifecycle flags", () => {
   assert.equal(options.dryRun, true);
   assert.equal(options.interactive, false);
   assert.throws(() => parseArgs(["install", "--all", "--harness", "codex"]), /either --all or --harness/);
+});
+
+test("CLI parsing accepts share and sync work selection", () => {
+  const shareOptions = parseArgs(["share", "--target", "/tmp/example", "--work", "2026-07-01-01-demo", "--dry-run", "--json"]);
+  assert.equal(shareOptions.command, "share");
+  assert.equal(shareOptions.work, "2026-07-01-01-demo");
+  assert.equal(shareOptions.dryRun, true);
+  assert.equal(shareOptions.json, true);
+
+  const syncOptions = parseArgs(["sync", "--target=/tmp/example", "--work=2026-07-01-01-demo", "--auto"]);
+  assert.equal(syncOptions.command, "sync");
+  assert.equal(syncOptions.work, "2026-07-01-01-demo");
+  assert.equal(syncOptions.auto, true);
+});
+
+test("share promotes active work visibility and sync skips local-only work", () => {
+  const root = target();
+  fs.mkdirSync(path.join(root, ".journal/work/2026-07-01-01-demo"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".journal/state.json"), JSON.stringify({ active_work_name: "2026-07-01-01-demo" }));
+  fs.writeFileSync(path.join(root, ".journal/work/2026-07-01-01-demo/work.md"), [
+    "---",
+    "id: wi_demo",
+    "slug: 2026-07-01-01-demo",
+    "title: Demo",
+    "status: active",
+    "visibility: local_only",
+    "createdBy: test@local",
+    "createdAt: \"2026-07-01T00:00:00.000Z\"",
+    "updatedAt: \"2026-07-01T00:00:00.000Z\"",
+    "---",
+    "",
+  ].join("\n"));
+
+  const skipped = sync({ target: root });
+  assert.equal(skipped.skipped, true);
+  assert.equal(skipped.reason, "visibility is local_only");
+
+  const result = share({ target: root });
+  assert.equal(result.changed, true);
+  assert.equal(result.visibility, "team_shared");
+  assert.match(read(root, ".journal/work/2026-07-01-01-demo/work.md"), /visibility: team_shared/);
 });
 
 test("detection distinguishes supported and future harness evidence", () => {
