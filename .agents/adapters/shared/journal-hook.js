@@ -4,6 +4,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const MARKER = /<!--\s*journal-status:\s*(closed|not-needed|off)(?:\s+([^>]*?))?\s*-->\s*$/i;
 
@@ -29,12 +30,27 @@ function findRoot(start) {
   }
 }
 
+function parseFrontmatter(text) {
+  if (!text.startsWith("---\n")) return {};
+  const end = text.indexOf("\n---", 4);
+  if (end === -1) return {};
+  const result = {};
+  for (const line of text.slice(4, end).split("\n")) {
+    const match = line.match(/^([A-Za-z][A-Za-z0-9]*):\s*(.*)$/);
+    if (!match) continue;
+    result[match[1]] = match[2].trim().replace(/^"(.*)"$/, "$1");
+  }
+  return result;
+}
+
 function activeWork(root) {
   try {
     const state = JSON.parse(fs.readFileSync(path.join(root, ".journal", "state.json"), "utf8"));
     if (typeof state.active_work_name !== "string" || !state.active_work_name) return null;
     const work = path.join(root, ".journal", "work", state.active_work_name, "work.md");
-    return fs.existsSync(work) ? state.active_work_name : null;
+    if (!fs.existsSync(work)) return null;
+    const metadata = parseFrontmatter(fs.readFileSync(work, "utf8"));
+    return { slug: state.active_work_name, visibility: metadata.visibility || "local_only", path: work };
   } catch {
     return null;
   }
@@ -60,14 +76,29 @@ function validateClosedPath(root, value) {
   return resolved.split(path.sep).join("/").includes("/journal/");
 }
 
-function handle(payload) {
+function syncSharedWork(root, work, runner) {
+  const run = runner || ((command, args, options) => spawnSync(command, args, options));
+  const result = run("journal", ["sync", "--auto", "--work", work.slug], {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 30000,
+  });
+  if (result.error) return { ok: false, message: result.error.message };
+  if (result.status !== 0) {
+    const output = `${result.stderr || ""}${result.stdout || ""}`.trim();
+    return { ok: false, message: output || `journal sync exited ${result.status}` };
+  }
+  return { ok: true, message: (result.stdout || "").trim() };
+}
+
+function handle(payload, options = {}) {
   const event = payload.hook_event_name;
   const root = findRoot(payload.cwd);
   if (!root) return {};
 
   if (event === "SessionStart") {
     const work = activeWork(root);
-    const suffix = work ? ` Active work: ${work}.` : " No valid active work is selected.";
+    const suffix = work ? ` Active work: ${work.slug}.` : " No valid active work is selected.";
     return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${suffix}`);
   }
 
@@ -99,6 +130,16 @@ function handle(payload) {
       reason: "The journal-status closed marker must reference an existing repository-relative Markdown spine entry under .journal/work/<work>/journal/.",
     };
   }
+  if (match[1].toLowerCase() === "closed") {
+    const work = activeWork(root);
+    if (work?.visibility === "team_shared") {
+      const result = syncSharedWork(root, work, options.syncRunner);
+      if (!result.ok) {
+        return context(event, `Journal entry is closed and work is team_shared, but automatic journal sync failed: ${result.message}`);
+      }
+      return context(event, "Journal entry is closed and team_shared work was synchronized.");
+    }
+  }
   return {};
 }
 
@@ -117,4 +158,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { handle };
+module.exports = { handle, parseFrontmatter };
