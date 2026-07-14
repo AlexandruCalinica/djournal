@@ -16,8 +16,9 @@ using it.
    - `.agents/rules/LINKS.md`
    - `.agents/rules/SAFETY.md`
    - `.agents/rules/STATE.md`
-2. Read `.journal/state.json`, then the active work item's `work.md`. Stop with
-   the `STATE.md` error if active work is unavailable.
+2. Resolve the journal root according to `STATE.md`; read `<journal-root>/state.json`,
+   then the active work item's `work.md`. Stop with the `STATE.md` error if
+   active work is unavailable.
 3. Read the latest spine entry when present. Its timeline is the primary index.
 4. List `_research/`, `docs/`, and `decisions/`; read only files relevant to the requested plan.
 5. If essential codebase context is absent, invoke `research-codebase` first.

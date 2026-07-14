@@ -21,8 +21,8 @@ that a task was meaningful.
 
 - If the user says `journal: off`, skip ambient journal reads and writes for the
   request unless another explicit instruction requires them.
-- If `.journal/state.json` selects active work, use `resume` when historical
-  context can affect the result.
+- If the resolved journal root's `state.json` selects active work, use `resume`
+  when historical context can affect the result.
 - If no active work exists and the request clearly starts a new durable work
   stream, use `init-work`. Ask only when its identity or scope is materially
   ambiguous.

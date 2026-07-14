@@ -5,8 +5,11 @@
 const path = require("node:path");
 const {
   InstallerError,
+  configure,
   doctor,
   install,
+  share,
+  sync,
   status,
   uninstall,
   upgrade,
@@ -21,11 +24,15 @@ function usage() {
   journal uninstall [--target DIR] [--harness LIST | --all]
   journal status [--target DIR] [--json]
   journal doctor [--target DIR] [--json]
+  journal config [--target DIR] [KEY [VALUE]] [--dry-run] [--json]
+  journal share [--target DIR] [--work SLUG] [--dry-run] [--json]
+  journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
 
 Options:
   --dry-run             Show the planned operation without writing
   --yes                 Disable interactive harness selection
   --json                Emit JSON
+  --work SLUG           Select a journal work item instead of active state
   --harness LIST        Comma-separated codex,claude-code selection
   --all                 Select or remove every supported harness
   --instructions-only   Install core instructions without harness hooks
@@ -35,7 +42,7 @@ Options:
 function parseArgs(argv) {
   const args = [...argv];
   const command = args.shift();
-  if (!command || !["install", "upgrade", "uninstall", "status", "doctor"].includes(command)) {
+  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "sync"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
@@ -45,6 +52,10 @@ function parseArgs(argv) {
       if (!args.length) throw new InstallerError("--target requires a value", "USAGE");
       options.target = args.shift();
     } else if (arg.startsWith("--target=")) options.target = arg.slice(9);
+    else if (arg === "--work") {
+      if (!args.length) throw new InstallerError("--work requires a value", "USAGE");
+      options.work = args.shift();
+    } else if (arg.startsWith("--work=")) options.work = arg.slice(7);
     else if (arg === "--harness") {
       if (!args.length) throw new InstallerError("--harness requires a value", "USAGE");
       options.harnesses.push(...args.shift().split(",").filter(Boolean));
@@ -52,9 +63,12 @@ function parseArgs(argv) {
     else if (arg === "--all") options.all = true;
     else if (arg === "--instructions-only") options.instructionsOnly = true;
     else if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--auto") options.auto = true;
     else if (arg === "--yes") options.yes = true;
     else if (arg === "--json") options.json = true;
     else if (arg === "--help" || arg === "-h") throw new InstallerError(usage(), "HELP");
+    else if (command === "config" && !options.key) options.key = arg;
+    else if (command === "config" && typeof options.value === "undefined") options.value = arg;
     else throw new InstallerError(`unknown option: ${arg}`, "USAGE");
   }
   if (options.all && options.harnesses.length) throw new InstallerError("use either --all or --harness", "USAGE");
@@ -76,6 +90,8 @@ function print(value, json) {
   else if (typeof value.installed === "boolean") process.stdout.write(value.installed ? `installed: ${value.target}\n` : `not installed: ${value.target}\n`);
   else process.stdout.write(`${value.ok ? "ok" : "failed"}: ${value.target}\n`);
   if (value.harnesses) process.stdout.write(`harnesses: ${value.harnesses.join(", ") || "instructions-only"}\n`);
+  if (value.key) process.stdout.write(`${value.key}: ${JSON.stringify(value.value)}\n`);
+  else if (value.config) process.stdout.write(`${JSON.stringify(value.config, null, 2)}\n`);
   if (value.conflicts?.length) process.stdout.write(`conflicts: ${value.conflicts.join(", ")}\n`);
   if (value.files) {
     for (const file of value.files) process.stdout.write(`${file.status.padEnd(8)} ${file.path}\n`);
@@ -101,6 +117,9 @@ async function main() {
     else if (options.command === "upgrade") result = await upgrade(options);
     else if (options.command === "uninstall") result = uninstall(options);
     else if (options.command === "status") result = status(options);
+    else if (options.command === "config") result = configure(options);
+    else if (options.command === "share") result = share(options);
+    else if (options.command === "sync") result = sync(options);
     else result = doctor(options);
     print(result, options.json);
     if (result.ok === false || result.installed === false || result.clean === false || result.conflicts?.length) process.exitCode = 2;

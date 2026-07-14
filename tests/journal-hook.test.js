@@ -68,6 +68,47 @@ test("closed marker requires an existing spine entry", () => {
   assert.equal(invalid.decision, "block");
 });
 
+test("closed marker validates repo-relative projection when global store is configured", () => {
+  const { root, entry, work } = fixture();
+  const store = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-store-"));
+  fs.mkdirSync(path.join(store, ".journal/work", work), { recursive: true });
+  fs.writeFileSync(path.join(store, ".journal/state.json"), JSON.stringify({ active_work_name: work }));
+  fs.writeFileSync(path.join(store, ".journal/work", work, "work.md"), "---\nid: wi_test\n---\n");
+  fs.writeFileSync(path.join(root, ".djournal.json"), JSON.stringify({
+    schemaVersion: 1,
+    projectKey: "test",
+    journalStore: store,
+  }));
+
+  const output = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${entry} -->` });
+  assert.deepEqual(output, {});
+});
+
+test("closed team-shared work does not auto-sync without standalone config", () => {
+  const { root, entry, work } = fixture();
+  fs.writeFileSync(path.join(root, `.journal/work/${work}/work.md`), "---\nid: wi_test\nvisibility: team_shared\n---\n");
+  let called = false;
+  const output = handle(
+    { cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${entry} -->` },
+    { syncRunner: () => { called = true; return { status: 0, stdout: "" }; } },
+  );
+  assert.deepEqual(output, {});
+  assert.equal(called, false);
+});
+
+test("closed team-shared work auto-syncs when standalone config enables auto", () => {
+  const { root, entry, work } = fixture();
+  fs.writeFileSync(path.join(root, `.journal/work/${work}/work.md`), "---\nid: wi_test\nvisibility: team_shared\n---\n");
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone", auto: true } }));
+  let called = false;
+  const output = handle(
+    { cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${entry} -->` },
+    { syncRunner: () => { called = true; return { status: 0, stdout: "ok" }; } },
+  );
+  assert.equal(called, true);
+  assert.match(output.hookSpecificOutput.additionalContext, /synchronized/);
+});
+
 test("status marker must be the final response content", () => {
   const { root } = fixture();
   const output = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: "<!-- journal-status: not-needed -->\nMore text" });

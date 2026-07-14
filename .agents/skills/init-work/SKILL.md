@@ -16,8 +16,9 @@ Create one project-level work item. Work items may span repositories.
    - `.agents/rules/STATE.md`
 2. Require a non-empty work name or infer one only when the user's requested
    project is unambiguous.
-3. List `.journal/work/` when it exists. Reject an equivalent existing work item
-   instead of creating a duplicate.
+3. Resolve the journal root according to `STATE.md`. List `<journal-root>/work/`
+   when it exists. Reject an equivalent existing work item instead of creating a
+   duplicate.
 4. Build the folder slug as `YYYY-MM-DD-NN-kebab-case-name` using the current UTC
    date and next unused daily sequence.
 5. Resolve `createdBy`, generate a `wi_` UUIDv7, and capture one canonical UTC
@@ -25,7 +26,7 @@ Create one project-level work item. Work items may span repositories.
 6. Create:
 
    ```text
-   .journal/work/<slug>/
+   <journal-root>/work/<slug>/
    ├── work.md
    ├── journal/
    ├── _research/
@@ -48,8 +49,8 @@ Create one project-level work item. Work items may span repositories.
    <What outcome this work item exists to achieve.>
    ```
 
-9. Create or update `.journal/state.json` to select the new slug. Preserve the
-   exact state shape from `STATE.md` and make the update safely.
+9. Create or update `<journal-root>/state.json` to select the new slug. Preserve
+   the exact state shape from `STATE.md` and make the update safely.
 10. Re-read `work.md` and state. Verify slug, IDs, directories, timestamps,
     status, visibility, and JSON validity.
 

@@ -1,7 +1,9 @@
 # djournal Workflow
 
-This repository uses `.journal/` as durable project memory and `.agents/` as
-the journal's rules and skills. Markdown is the source of truth.
+This repository uses the journal root resolved by `.agents/rules/STATE.md` as
+durable project memory and `.agents/` as the journal's rules and skills.
+Markdown is the source of truth. If `.djournal.json` exists, the canonical
+journal root is the configured global store, not the local `.journal/` scaffold.
 
 For every request:
 
