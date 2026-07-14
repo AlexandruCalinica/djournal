@@ -7,6 +7,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const MARKER = /<!--\s*journal-status:\s*(closed|not-needed|off)(?:\s+([^>]*?))?\s*-->\s*$/i;
+const PROJECT_MARKER_PATH = ".djournal.json";
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -43,32 +44,46 @@ function parseFrontmatter(text) {
   return result;
 }
 
+function projectContext(root) {
+  try {
+    const markerFile = path.join(root, PROJECT_MARKER_PATH);
+    if (!fs.existsSync(markerFile)) return { root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
+    const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+    if (!marker.journalStore) return { root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
+    const store = path.resolve(marker.journalStore);
+    return { root, journalRoot: path.join(store, ".journal"), configFile: path.join(store, "config.json"), global: true };
+  } catch {
+    return { root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
+  }
+}
+
 function activeWork(root) {
   try {
-    const state = JSON.parse(fs.readFileSync(path.join(root, ".journal", "state.json"), "utf8"));
+    const context = projectContext(root);
+    const state = JSON.parse(fs.readFileSync(path.join(context.journalRoot, "state.json"), "utf8"));
     if (typeof state.active_work_name !== "string" || !state.active_work_name) return null;
-    const work = path.join(root, ".journal", "work", state.active_work_name, "work.md");
+    const work = path.join(context.journalRoot, "work", state.active_work_name, "work.md");
     if (!fs.existsSync(work)) return null;
     const metadata = parseFrontmatter(fs.readFileSync(work, "utf8"));
-    return { slug: state.active_work_name, visibility: metadata.visibility || "local_only", path: work };
+    const config = readConfig(context);
+    const shared = config.sharing?.sharedWorkItems && Object.prototype.hasOwnProperty.call(config.sharing.sharedWorkItems, state.active_work_name);
+    return { slug: state.active_work_name, visibility: metadata.visibility || "local_only", shared: !!shared, path: work };
   } catch {
     return null;
   }
 }
 
-function readSyncConfig(root) {
+function readConfig(context) {
   try {
-    const file = path.join(root, ".journal", "config.json");
-    if (!fs.existsSync(file)) return {};
-    const config = JSON.parse(fs.readFileSync(file, "utf8"));
-    return config.sync && typeof config.sync === "object" ? config.sync : {};
+    if (!fs.existsSync(context.configFile)) return {};
+    return JSON.parse(fs.readFileSync(context.configFile, "utf8"));
   } catch {
     return {};
   }
 }
 
 function shouldAutoSync(root) {
-  const config = readSyncConfig(root);
+  const config = readConfig(projectContext(root)).sync || {};
   return config.enabled === true && config.auto === true && config.mode === "standalone";
 }
 
@@ -85,11 +100,22 @@ function validateClosedPath(root, value) {
   if (!value) return false;
   const relative = value.trim().replaceAll("\\", "/");
   if (!relative.endsWith(".md") || path.isAbsolute(relative)) return false;
-  const resolved = path.resolve(root, relative);
-  const journalRoot = path.resolve(root, ".journal", "work") + path.sep;
-  if (!resolved.startsWith(journalRoot)) return false;
-  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) return false;
-  return resolved.split(path.sep).join("/").includes("/journal/");
+
+  const validSpineEntry = (resolved, journalRoot) => {
+    const workRoot = path.resolve(journalRoot, "work") + path.sep;
+    if (!resolved.startsWith(workRoot)) return false;
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) return false;
+    return resolved.split(path.sep).join("/").includes("/journal/");
+  };
+
+  const repoResolved = path.resolve(root, relative);
+  if (validSpineEntry(repoResolved, path.join(root, ".journal"))) return true;
+
+  const context = projectContext(root);
+  const resolved = relative.startsWith(".journal/")
+    ? path.resolve(context.journalRoot, relative.slice(".journal/".length))
+    : path.resolve(root, relative);
+  return validSpineEntry(resolved, context.journalRoot);
 }
 
 function syncSharedWork(root, work, runner) {
@@ -148,12 +174,12 @@ function handle(payload, options = {}) {
   }
   if (match[1].toLowerCase() === "closed") {
     const work = activeWork(root);
-    if (work?.visibility === "team_shared" && shouldAutoSync(root)) {
+    if ((work?.shared || work?.visibility === "team_shared") && shouldAutoSync(root)) {
       const result = syncSharedWork(root, work, options.syncRunner);
       if (!result.ok) {
-        return context(event, `Journal entry is closed and work is team_shared, but automatic journal sync failed: ${result.message}`);
+        return context(event, `Journal entry is closed and shared work automatic journal sync failed: ${result.message}`);
       }
-      return context(event, "Journal entry is closed and team_shared work was synchronized.");
+      return context(event, "Journal entry is closed and shared work was synchronized.");
     }
   }
   return {};

@@ -1,8 +1,8 @@
 # Work Item Rules
 
-Agent configuration lives under `.agents/`. Durable journal data lives under
-`.journal/`. Skills MUST read rules from `.agents/rules/` and MUST NOT write
-runtime work data into `.agents/`.
+Agent configuration lives under `.agents/`. Durable journal data lives under the
+resolved journal root from `STATE.md`. Skills MUST read rules from
+`.agents/rules/` and MUST NOT write runtime work data into `.agents/`.
 
 Read these rules together with:
 
@@ -13,10 +13,10 @@ Read these rules together with:
 
 ## Work item layout
 
-When creating a work item, create this structure:
+When creating a work item, create this structure under the resolved journal root:
 
 ```text
-.journal/work/YYYY-MM-DD-NN-work-name/
+<journal-root>/work/YYYY-MM-DD-NN-work-name/
 ├── work.md
 ├── journal/
 ├── _research/
@@ -52,7 +52,7 @@ Example: `2026-06-29-01-portable-journal-skill-improvements`.
 5. Create `work.md` with all required work-item metadata.
 6. Default to `status: active` and `visibility: local_only`.
 7. Set `createdAt` and `updatedAt` to the same current UTC timestamp.
-8. Set `.journal/state.json` to the new slug according to `STATE.md`.
+8. Set `<journal-root>/state.json` to the new slug according to `STATE.md`.
 
 Work items are projects, not repositories. A project MAY span many repositories,
 branches, and working directories. Do not create a new work item merely because
@@ -71,9 +71,9 @@ Allowed status values:
 Status updates preserve `createdAt`, update `updatedAt`, and never alter `id` or
 `slug`. Visibility changes require an explicit user request.
 
-Only one work item is selected as active in `.journal/state.json`, but other work
-items may remain in `active` status. Active selection and lifecycle status are
-different concepts.
+Only one work item is selected as active in `<journal-root>/state.json`, but
+other work items may remain in `active` status. Active selection and lifecycle
+status are different concepts.
 
 ## Legacy work items
 

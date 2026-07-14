@@ -7,8 +7,9 @@ transport they use for code. There are two different modes:
 - standalone journal repository for multi-repo or team-wide memory
 
 The `djournal sync` command is opt-in and intended for standalone journal
-repositories. In colocated mode, normal product repository commits already carry
-the journal, so `djournal sync` should be disabled or skipped.
+repositories or colocated projections. The canonical journal stays in
+`~/.djournal/projects/<project-key>/`; sync copies explicitly shared work into
+the configured Git-backed projection.
 
 ## Colocated repository
 
@@ -18,18 +19,23 @@ the code:
 ```bash
 cd my-product
 djournal install --all
-git add .agents .codex .claude AGENTS.md CLAUDE.md spec.md .journal
+djournal config sync.enabled true
+djournal config sync.mode colocated
+djournal config sync.path .
+djournal share --work 2026-07-03-01-example
+djournal sync --work 2026-07-03-01-example
+git add .agents .codex .claude AGENTS.md CLAUDE.md .djournal.json .journal
 git commit -m "chore: install djournal"
 git push origin main
 ```
 
 Only share journal work that is safe for the team to see. In colocated mode,
-Git decides what is shared: if `.journal/` is tracked, journal files travel
-with ordinary commits. Work item visibility is still useful as a human/agent
-signal, but it does not stop Git from committing files that are already tracked.
+`djournal share` updates the global sharing index and `djournal sync` projects
+that work into the repository `.journal/`. Git publication then happens through
+normal product commits.
 
-If `.journal/` or `.journal/work/...` is ignored, `djournal share` can promote
-the work item but Git will not include it unless you update `.gitignore` or
+If `.journal/` or `.journal/work/...` is ignored, projection can still create
+files locally, but Git will not include them unless you update `.gitignore` or
 force-add the intended path:
 
 ```bash
@@ -45,29 +51,18 @@ mkdir my-product-journal
 cd my-product-journal
 git init
 djournal install --all
+djournal config sync.enabled true
+djournal config sync.mode standalone
+djournal config sync.path .
+djournal config sync.auto true
 git remote add origin git@github.com:example/my-product-journal.git
 git add .
 git commit -m "chore: bootstrap journal"
 git push -u origin main
 ```
 
-Keep the repository next to the code repositories and let agents run from the
-journal repository when they need durable memory across the whole product.
-
-Enable standalone sync explicitly:
-
-```bash
-mkdir -p .journal
-cat > .journal/config.json <<'JSON'
-{
-  "sync": {
-    "enabled": true,
-    "mode": "standalone",
-    "auto": true
-  }
-}
-JSON
-```
+Keep the repository next to the code repositories and point `sync.path` at it
+from the workspace/project that owns the global journal store.
 
 ## Bootstrapping from an existing remote
 
@@ -83,9 +78,8 @@ djournal status
 If `.journal/` is already present after clone, the install step refreshes local
 harness integration without replacing durable journal history.
 
-If the remote was created for standalone journal sync, verify or add
-`.journal/config.json` with `sync.enabled: true`, `sync.mode: "standalone"`,
-and `sync.auto: true` before expecting hooks to synchronize automatically.
+If the remote was created for standalone journal sync, verify config with
+`djournal config` before expecting hooks to synchronize automatically.
 
 ## Sharing a work item
 
@@ -102,9 +96,9 @@ Select a specific work item:
 djournal share --work 2026-07-03-01-git-backed-journal-collaboration
 ```
 
-Sharing is a visibility escalation. Treat it as durable: once content has been
-pushed to a team remote, moving it back to local-only does not remove it from
-Git history or teammates' clones.
+Sharing is a publication intent recorded in the global config. Treat it as
+durable: once projected content has been pushed to a team remote, removing it
+from the sharing index does not remove it from Git history or teammates' clones.
 
 ## Synchronizing shared work
 
@@ -122,17 +116,14 @@ djournal sync --work 2026-07-03-01-git-backed-journal-collaboration
 
 Current behavior:
 
-- sync is skipped unless `.journal/config.json` opts in
-- colocated mode is skipped
-- local-only work is skipped
-- shared work requires `.journal/` to be inside a Git work tree
+- sync is skipped unless global `config.json` opts in
+- unshared work is skipped
+- colocated mode copies shared work into the configured product repo projection
+- standalone mode copies shared work and then uses conservative Git operations
 - unresolved journal conflicts stop sync
-- sync uses conservative Git operations to pull, add, commit, and push journal
-  changes
 
 Hook-triggered sync uses the same command path with `--auto` only when
-`.journal/config.json` enables standalone automatic sync and the closed work is
-team-shared.
+global config enables standalone automatic sync and the closed work is shared.
 
 ## Keep local state local
 
@@ -141,6 +132,7 @@ local operational state unless a future workflow explicitly says otherwise:
 
 - `.journal/state.json`
 - `.journal/.install/`
+- `.djournal.json` when the team does not want to share the local store pointer
 - local harness cache or runtime files
 
 The durable team memory is the work item content: `work.md`, `journal/`,

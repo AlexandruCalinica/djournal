@@ -1,7 +1,8 @@
 # Visibility and Sharing
 
-Visibility answers who the work is intended to be shared with. It belongs to
-the work item, not to individual entries.
+Visibility answers who the work is intended for. Sharing answers whether a work
+item should be projected out of the private global store into a Git-backed
+location. They are related but no longer the same control.
 
 ## Visibility values
 
@@ -11,17 +12,17 @@ the work item, not to individual entries.
 | `private_synced` | Reserved compatibility state for private synchronized work. |
 | `team_shared` | Eligible for team sharing and Git-backed sync. |
 
-New work starts as `local_only`.
+New work starts as `local_only` and unshared.
 
 ## Sharing a work item
 
-Promote the active work item:
+Mark the active work item as shared:
 
 ```bash
 djournal share
 ```
 
-Promote a specific work item:
+Mark a specific work item as shared:
 
 ```bash
 djournal share --work 2026-07-03-01-git-backed-journal-collaboration
@@ -33,9 +34,10 @@ Dry run:
 djournal share --dry-run --json
 ```
 
-`share` changes visibility. It does not by itself guarantee remote publication.
-In colocated repositories, Git publication is whatever normal commits include.
-In standalone journal repositories, Git transport is handled by opt-in `sync`.
+`share` updates `sharing.sharedWorkItems` in the global project config. It does
+not edit `work.md` visibility and does not by itself guarantee remote
+publication. Publication requires `djournal sync` plus the relevant Git commit
+or push for the configured mode.
 
 ## Sync and visibility
 
@@ -45,25 +47,33 @@ Run sync:
 djournal sync
 ```
 
-If the selected work item is `local_only`, sync skips it:
+If the selected work item has not been shared, sync skips it:
 
 ```json
 {
   "action": "sync",
   "skipped": true,
-  "reason": "visibility is local_only"
+  "reason": "work is not shared"
 }
 ```
 
-For `team_shared` work, sync performs conservative Git operations only when
-`.journal/config.json` explicitly enables standalone sync. In colocated mode,
-sync is skipped because normal repository commits already carry the journal.
+For shared work, sync is still opt-in through global config:
+
+```bash
+djournal config sync.enabled true
+djournal config sync.mode colocated
+djournal sync
+```
+
+In colocated mode, sync copies shared work into the product repository
+projection. In standalone mode, sync copies shared work into the standalone
+journal repository and performs conservative Git operations.
 
 ## Safety model
 
-Treat sharing as a durable escalation. After journal content enters a shared
-Git remote, it may remain in Git history and teammates' clones even if local
-metadata changes later.
+Treat sharing as a durable escalation. After projected journal content enters a
+shared Git remote, it may remain in Git history and teammates' clones even if
+local sharing metadata changes later.
 
 Before sharing, check for:
 

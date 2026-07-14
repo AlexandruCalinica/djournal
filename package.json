@@ -23,6 +23,7 @@
   "scripts": {
     "check:package": "node scripts/check-package.cjs",
     "check:pr-title": "node scripts/check-pr-title.js",
+    "link:global": "npm link",
     "release": "semantic-release",
     "test": "node tests/journal-hook.test.js && node tests/installer/installer.test.js && node tests/release-policy.test.js && npm run check:package",
     "prepublishOnly": "npm test"

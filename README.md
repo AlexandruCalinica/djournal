@@ -183,28 +183,49 @@ npx djournal install
 
 Then use your coding agent normally.
 
+Install creates a local project marker (`.djournal.json`) and a canonical
+per-project store under `~/.djournal/projects/<project-key>/`:
+
+```text
+~/.djournal/projects/<project-key>/
+  config.json
+  .journal/
+```
+
+The project store is the private write target. A repository `.journal/` or
+standalone journal repo is a projection that receives shared work only after
+you opt in.
+
+For Claude Code, install also grants the project access to that exact global
+store path in `.claude/settings.json`, plus the safe `journal`/`djournal`
+commands used by the workflow. Codex uses runtime sandbox configuration for
+filesystem access, so sandboxed Codex sessions must include the generated store
+path when they need canonical journal memory.
+
 ## Lifecycle
 
 ```bash
-npx djournal status
-npx djournal doctor
-npx djournal share
-npx djournal sync
-npx djournal upgrade
-npx djournal uninstall
+djournal status
+djournal doctor
+djournal config sync.enabled true
+djournal share
+djournal sync
+djournal upgrade
+djournal uninstall
 ```
 
 Installation preserves existing agent configuration. Uninstallation removes
-djournal's tooling while retaining `.journal/` so the project memory can be
-revived later.
+djournal's tooling while retaining durable project memory and the project
+marker so the journal can be revived later.
 
 Existing `AGENTS.md` and `CLAUDE.md` files are never replaced. djournal adds an
 owned block, updates only that block, and removes only that block during
 uninstall; surrounding project instructions remain untouched.
 
-`share` promotes the active work item to shared visibility. `sync` is opt-in and
-intended for standalone journal repositories; colocated journals usually travel
-with normal product repository commits.
+`share` marks the active work item in the global sharing index. `sync` is
+opt-in; in colocated mode it projects shared work into the product repository
+for normal commits, and in standalone mode it projects shared work into a
+dedicated journal repository.
 
 ## Status
 

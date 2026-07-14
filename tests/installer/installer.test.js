@@ -7,10 +7,14 @@ const path = require("node:path");
 const test = require("node:test");
 
 const sourceRoot = path.resolve(__dirname, "../..");
+const djournalHome = fs.mkdtempSync(path.join(os.tmpdir(), "djournal-home-"));
+process.env.DJOURNAL_HOME = djournalHome;
 const { parseArgs } = require("../../bin/journal.js");
 const {
   InstallerError,
   MANIFEST_PATH,
+  PROJECT_MARKER_PATH,
+  configure,
   detectHarnesses,
   install,
   loadManifest,
@@ -117,11 +121,13 @@ test("CLI parsing accepts share and sync work selection", () => {
   assert.equal(syncOptions.auto, true);
 });
 
-test("sync is opt-in and share promotes active work visibility", () => {
+test("global store config gates share projection and sync", () => {
   const root = target();
-  fs.mkdirSync(path.join(root, ".journal/work/2026-07-01-01-demo"), { recursive: true });
-  fs.writeFileSync(path.join(root, ".journal/state.json"), JSON.stringify({ active_work_name: "2026-07-01-01-demo" }));
-  fs.writeFileSync(path.join(root, ".journal/work/2026-07-01-01-demo/work.md"), [
+  const store = path.join(djournalHome, "projects", "demo");
+  fs.mkdirSync(path.join(store, ".journal/work/2026-07-01-01-demo/journal"), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "demo", journalStore: store }));
+  fs.writeFileSync(path.join(store, ".journal/state.json"), JSON.stringify({ active_work_name: "2026-07-01-01-demo" }));
+  fs.writeFileSync(path.join(store, ".journal/work/2026-07-01-01-demo/work.md"), [
     "---",
     "id: wi_demo",
     "slug: 2026-07-01-01-demo",
@@ -134,25 +140,48 @@ test("sync is opt-in and share promotes active work visibility", () => {
     "---",
     "",
   ].join("\n"));
+  fs.writeFileSync(path.join(store, ".journal/work/2026-07-01-01-demo/journal/2026-07-01-01-demo.md"), "# Demo\n");
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({ sync: { enabled: false, mode: "colocated", path: root }, sharing: { sharedWorkItems: {} } }));
 
   const disabled = sync({ target: root });
   assert.equal(disabled.skipped, true);
   assert.equal(disabled.reason, "sync is not enabled");
 
-  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "colocated" } }));
-  const colocated = sync({ target: root });
-  assert.equal(colocated.skipped, true);
-  assert.equal(colocated.reason, "sync mode is colocated");
-
-  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone" } }));
-  const localOnly = sync({ target: root });
-  assert.equal(localOnly.skipped, true);
-  assert.equal(localOnly.reason, "visibility is local_only");
+  configure({ target: root, key: "sync.enabled", value: "true" });
+  const unshared = sync({ target: root });
+  assert.equal(unshared.skipped, true);
+  assert.equal(unshared.reason, "work is not shared");
 
   const result = share({ target: root });
   assert.equal(result.changed, true);
-  assert.equal(result.visibility, "team_shared");
-  assert.match(read(root, ".journal/work/2026-07-01-01-demo/work.md"), /visibility: team_shared/);
+  assert.equal(result.shared, true);
+  assert.equal(json(store, "config.json").sharing.sharedWorkItems["2026-07-01-01-demo"].sharedBy.endsWith("@local") || json(store, "config.json").sharing.sharedWorkItems["2026-07-01-01-demo"].sharedBy.includes("@"), true);
+
+  const projected = sync({ target: root });
+  assert.equal(projected.skipped, undefined);
+  assert.equal(fs.existsSync(path.join(root, ".journal/work/2026-07-01-01-demo/work.md")), true);
+  assert.equal(fs.existsSync(path.join(root, ".journal/work/2026-07-01-01-demo/journal/2026-07-01-01-demo.md")), true);
+});
+
+test("install bootstraps global project store and migrates durable journal content", async () => {
+  const root = target();
+  fs.mkdirSync(path.join(root, ".journal/work/2026-07-01-01-demo"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".journal/.install"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".journal/state.json"), JSON.stringify({ active_work_name: "2026-07-01-01-demo" }));
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "colocated" } }));
+  fs.writeFileSync(path.join(root, ".journal/.install/local.json"), "{}\n");
+  fs.writeFileSync(path.join(root, ".journal/work/2026-07-01-01-demo/work.md"), "---\nid: wi_demo\n---\n");
+
+  await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
+
+  const marker = json(root, PROJECT_MARKER_PATH);
+  assert.equal(marker.schemaVersion, 1);
+  assert.equal(fs.existsSync(path.join(marker.journalStore, "config.json")), true);
+  assert.equal(fs.existsSync(path.join(marker.journalStore, ".journal/state.json")), true);
+  assert.equal(fs.existsSync(path.join(marker.journalStore, ".journal/work/2026-07-01-01-demo/work.md")), true);
+  assert.equal(fs.existsSync(path.join(marker.journalStore, ".journal/config.json")), false);
+  assert.equal(fs.existsSync(path.join(marker.journalStore, ".journal/.install/local.json")), false);
+  assert.equal(json(marker.journalStore, "config.json").sync.enabled, true);
 });
 
 test("detection distinguishes supported and future harness evidence", () => {
@@ -189,14 +218,30 @@ test("both-harness install is idempotent and partial/full uninstall preserves us
   assert.equal(count(read(root, "AGENTS.md"), BEGIN), 1);
   assert.equal(count(read(root, "CLAUDE.md"), BEGIN), 1);
   assert.equal(json(root, ".codex/hooks.json").custom, true);
-  assert.deepEqual(json(root, ".claude/settings.json").permissions, { defaultMode: "ask" });
+  assert.equal(json(root, ".claude/settings.json").permissions.defaultMode, "ask");
   assert.equal(fs.existsSync(path.join(root, ".journal/state.json")), false);
+  const marker = json(root, PROJECT_MARKER_PATH);
+  const claudeSettings = json(root, ".claude/settings.json");
+  assert.equal(claudeSettings.permissions.additionalDirectories.includes(marker.journalStore), true);
+  assert.equal(claudeSettings.permissions.allow.includes("Bash(journal status:*)"), true);
+  assert.equal(
+    claudeSettings.hooks.SessionStart[0].hooks[0].statusMessage,
+    "Loading journal workflow",
+  );
+  assert.equal(
+    claudeSettings.hooks.Stop
+      .flatMap((group) => group.hooks)
+      .find((hook) => hook.args?.includes("--harness") && hook.args?.includes("claude-code"))
+      ?.statusMessage,
+    "Checking journal closure",
+  );
 
   const second = await install(options);
   assert.equal(second.action, "upgrade");
   assert.equal(count(read(root, "AGENTS.md"), BEGIN), 1);
   assert.equal(json(root, ".codex/hooks.json").hooks.Stop.length, 2);
   assert.equal(status({ target: root }).clean, true);
+  assert.equal(json(root, ".claude/settings.json").permissions.additionalDirectories.filter((item) => item === marker.journalStore).length, 1);
 
   const partial = uninstall({ target: root, harnesses: ["codex"] });
   assert.equal(partial.action, "partial-uninstall");
@@ -204,6 +249,7 @@ test("both-harness install is idempotent and partial/full uninstall preserves us
   assert.equal(json(root, ".codex/hooks.json").hooks.Stop.length, 1);
   assert.equal(fs.existsSync(path.join(root, ".agents/rules/AUTOMATION.md")), true);
   assert.equal(count(read(root, "CLAUDE.md"), BEGIN), 1);
+  assert.equal(json(root, ".claude/settings.json").permissions.additionalDirectories.includes(marker.journalStore), true);
 
   fs.mkdirSync(path.join(root, ".journal/work/example"), { recursive: true });
   fs.writeFileSync(path.join(root, ".journal/work/example/work.md"), "history\n");
@@ -280,6 +326,7 @@ test("malformed shared JSON fails before installation writes", async () => {
   );
   assert.equal(fs.existsSync(path.join(root, MANIFEST_PATH)), false);
   assert.equal(fs.existsSync(path.join(root, "spec.md")), false);
+  assert.equal(fs.existsSync(path.join(root, ".agents/rules/AUTOMATION.md")), false);
 });
 
 test("symlink destinations are rejected before writes", async () => {
@@ -297,17 +344,17 @@ test("symlink destinations are rejected before writes", async () => {
 test("modified copied assets block upgrade and survive uninstall with ownership retained", async () => {
   const root = target();
   await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
-  fs.appendFileSync(path.join(root, "spec.md"), "\nlocal modification\n");
+  fs.appendFileSync(path.join(root, ".agents/rules/AUTOMATION.md"), "\nlocal modification\n");
   await assert.rejects(
     upgrade({ sourceRoot, target: root, interactive: false }),
     (error) => error instanceof InstallerError && error.code === "ASSET_CONFLICT",
   );
   const result = uninstall({ target: root });
   assert.equal(result.action, "uninstall-with-conflicts");
-  assert.deepEqual(result.conflicts, ["spec.md"]);
-  assert.match(read(root, "spec.md"), /local modification/);
+  assert.deepEqual(result.conflicts, [".agents/rules/AUTOMATION.md"]);
+  assert.match(read(root, ".agents/rules/AUTOMATION.md"), /local modification/);
   const manifest = loadManifest(root);
-  assert.deepEqual(manifest.files.map((record) => record.path), ["spec.md"]);
+  assert.deepEqual(manifest.files.map((record) => record.path), [".agents/rules/AUTOMATION.md"]);
 });
 
 test("injected transaction failure rolls every file back", async () => {

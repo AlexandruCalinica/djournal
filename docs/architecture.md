@@ -5,16 +5,34 @@ RAG systems, graph views, and model context are projections over that source.
 
 ## Directory layout
 
+The canonical journal lives in the user's djournal home, keyed by project:
+
 ```text
-.journal/
+~/.djournal/projects/<project-key>/
   config.json
-  state.json
-  work/<work-item>/
-    work.md
-    journal/
-    decisions/
-    docs/
-    _research/
+  .journal/
+    state.json
+    work/<work-item>/
+      work.md
+      journal/
+      decisions/
+      docs/
+      _research/
+```
+
+The installed project contains a marker that points back to that store:
+
+```text
+.djournal.json
+```
+
+When sync is enabled, a repository-local `.journal/` is a projection containing
+the shared work items copied out of the global store.
+
+```text
+<projection-target>/
+  .journal/
+    work/<shared-work-item>/
 ```
 
 ## Work items
@@ -25,7 +43,7 @@ repositories, branches, harnesses, and models.
 Every work item has:
 
 ```text
-.journal/work/<slug>/work.md
+~/.djournal/projects/<project-key>/.journal/work/<slug>/work.md
 ```
 
 The frontmatter stores stable identity, title, status, visibility, authorship,
@@ -33,22 +51,41 @@ and timestamps.
 
 ## Configuration
 
-`.journal/config.json` stores repository-level journal behavior. Sync is
-disabled unless configuration opts in:
+`config.json` is a sibling of the global `.journal/` directory. It stores
+project identity, sync settings, and the sharing index. Sync is disabled unless
+configuration opts in:
 
 ```json
 {
+  "project": {
+    "id": "my-product-a1b2c3d4",
+    "name": "my-product",
+    "sourcePath": "/workspace/my-product"
+  },
   "sync": {
     "enabled": true,
-    "mode": "standalone",
-    "auto": true
+    "mode": "colocated",
+    "path": "/workspace/my-product",
+    "auto": false
+  },
+  "sharing": {
+    "default": "local_only",
+    "sharedWorkItems": {}
   }
 }
 ```
 
+Use the CLI to change it:
+
+```bash
+djournal config sync.enabled true
+djournal config sync.mode colocated
+djournal config sync.path /workspace/my-product
+```
+
 Use `mode: "standalone"` for a dedicated journal repository. Use
-`mode: "colocated"` or omit sync configuration when `.journal/` is committed
-with a product repository and normal Git commits carry journal history.
+`mode: "colocated"` when shared work should be projected into the product
+repository and published by normal product commits.
 
 ## Entry types
 
@@ -122,7 +159,14 @@ work such as resume, planning, research, decision capture, documentation,
 audit, reconciliation, and closure.
 
 Hooks remind agents about the workflow and validate final status markers. Hooks
-do not create semantic journal entries.
+do not create semantic journal entries. When `.djournal.json` exists, hooks read
+active work and sync config from the global project store.
+
+For Claude Code, install also injects a narrow permission grant into
+`.claude/settings.json` for the exact global project store path and safe
+`journal`/`djournal` commands. Codex filesystem access is governed by the Codex
+runtime sandbox, so Codex sessions must be launched with the global store path
+available when sandboxing would otherwise hide `~/.djournal`.
 
 ## Related docs
 

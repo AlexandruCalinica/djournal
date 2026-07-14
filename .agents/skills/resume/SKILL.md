@@ -15,7 +15,8 @@ Operate read-only.
    - `.agents/rules/LINKS.md`
    - `.agents/rules/SAFETY.md`
    - `.agents/rules/STATE.md`
-2. Resolve `.journal/state.json`; read the active `work.md`.
+2. Resolve the journal root according to `STATE.md`; read `<journal-root>/state.json`,
+   then the active `work.md`.
 3. If `work.md` is legacy/missing, infer a temporary title/slug and clearly mark
    metadata as incomplete. Do not repair it.
 4. Index entry frontmatter under `journal/`, `_research/`, `docs/`, and

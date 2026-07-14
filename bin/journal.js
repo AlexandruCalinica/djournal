@@ -5,6 +5,7 @@
 const path = require("node:path");
 const {
   InstallerError,
+  configure,
   doctor,
   install,
   share,
@@ -23,6 +24,7 @@ function usage() {
   journal uninstall [--target DIR] [--harness LIST | --all]
   journal status [--target DIR] [--json]
   journal doctor [--target DIR] [--json]
+  journal config [--target DIR] [KEY [VALUE]] [--dry-run] [--json]
   journal share [--target DIR] [--work SLUG] [--dry-run] [--json]
   journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
 
@@ -40,7 +42,7 @@ Options:
 function parseArgs(argv) {
   const args = [...argv];
   const command = args.shift();
-  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "share", "sync"].includes(command)) {
+  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "sync"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
@@ -65,6 +67,8 @@ function parseArgs(argv) {
     else if (arg === "--yes") options.yes = true;
     else if (arg === "--json") options.json = true;
     else if (arg === "--help" || arg === "-h") throw new InstallerError(usage(), "HELP");
+    else if (command === "config" && !options.key) options.key = arg;
+    else if (command === "config" && typeof options.value === "undefined") options.value = arg;
     else throw new InstallerError(`unknown option: ${arg}`, "USAGE");
   }
   if (options.all && options.harnesses.length) throw new InstallerError("use either --all or --harness", "USAGE");
@@ -86,6 +90,8 @@ function print(value, json) {
   else if (typeof value.installed === "boolean") process.stdout.write(value.installed ? `installed: ${value.target}\n` : `not installed: ${value.target}\n`);
   else process.stdout.write(`${value.ok ? "ok" : "failed"}: ${value.target}\n`);
   if (value.harnesses) process.stdout.write(`harnesses: ${value.harnesses.join(", ") || "instructions-only"}\n`);
+  if (value.key) process.stdout.write(`${value.key}: ${JSON.stringify(value.value)}\n`);
+  else if (value.config) process.stdout.write(`${JSON.stringify(value.config, null, 2)}\n`);
   if (value.conflicts?.length) process.stdout.write(`conflicts: ${value.conflicts.join(", ")}\n`);
   if (value.files) {
     for (const file of value.files) process.stdout.write(`${file.status.padEnd(8)} ${file.path}\n`);
@@ -111,6 +117,7 @@ async function main() {
     else if (options.command === "upgrade") result = await upgrade(options);
     else if (options.command === "uninstall") result = uninstall(options);
     else if (options.command === "status") result = status(options);
+    else if (options.command === "config") result = configure(options);
     else if (options.command === "share") result = share(options);
     else if (options.command === "sync") result = sync(options);
     else result = doctor(options);

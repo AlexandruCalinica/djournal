@@ -16,8 +16,9 @@ progress.
    - `.agents/rules/LINKS.md`
    - `.agents/rules/SAFETY.md`
    - `.agents/rules/STATE.md`
-2. Resolve the active work from `.journal/state.json` and read its `work.md`.
-   Stop according to `STATE.md` if unavailable.
+2. Resolve the journal root according to `STATE.md`; read `<journal-root>/state.json`,
+   then the active work item's `work.md`. Stop according to `STATE.md` if
+   unavailable.
 3. Read the latest spine entry and its project timeline when present.
 4. Identify research, docs, and decisions actually used this session.
 

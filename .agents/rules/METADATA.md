@@ -11,7 +11,8 @@ as `type`, `work_item`, `created_at`, `privacy`, or `role`.
 
 ### Work item
 
-Every work item MUST have `.journal/work/<slug>/work.md` with this frontmatter:
+Every work item MUST have `<journal-root>/work/<slug>/work.md` with this
+frontmatter:
 
 ```yaml
 ---

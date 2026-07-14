@@ -8,7 +8,8 @@
             "type": "command",
             "command": "node",
             "args": ["${CLAUDE_PROJECT_DIR}/.agents/adapters/shared/journal-hook.js", "--harness", "claude-code"],
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "Loading journal workflow"
           }
         ]
       }
@@ -32,7 +33,8 @@
             "type": "command",
             "command": "node",
             "args": ["${CLAUDE_PROJECT_DIR}/.agents/adapters/shared/journal-hook.js", "--harness", "claude-code"],
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "Checking journal closure"
           }
         ]
       }
