@@ -25,7 +25,7 @@ function usage() {
   journal status [--target DIR] [--json]
   journal doctor [--target DIR] [--json]
   journal config [--target DIR] [KEY [VALUE]] [--dry-run] [--json]
-  journal share [--target DIR] [--work SLUG] [--dry-run] [--json]
+  journal share [--target DIR] [--work SLUG | --all] [--dry-run] [--json]
   journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
 
 Options:
@@ -34,7 +34,7 @@ Options:
   --json                Emit JSON
   --work SLUG           Select a journal work item instead of active state
   --harness LIST        Comma-separated codex,claude-code selection
-  --all                 Select or remove every supported harness
+  --all                 Select all work items for share, or every harness
   --instructions-only   Install core instructions without harness hooks
 `;
 }
@@ -72,6 +72,10 @@ function parseArgs(argv) {
     else throw new InstallerError(`unknown option: ${arg}`, "USAGE");
   }
   if (options.all && options.harnesses.length) throw new InstallerError("use either --all or --harness", "USAGE");
+  if (options.all && options.work) throw new InstallerError("use either --all or --work", "USAGE");
+  if (options.all && !["install", "uninstall", "share"].includes(command)) {
+    throw new InstallerError(`--all is not supported for ${command}`, "USAGE");
+  }
   if (options.instructionsOnly && (options.all || options.harnesses.length)) {
     throw new InstallerError("--instructions-only cannot be combined with harness selection", "USAGE");
   }
@@ -92,6 +96,12 @@ function print(value, json) {
   if (value.harnesses) process.stdout.write(`harnesses: ${value.harnesses.join(", ") || "instructions-only"}\n`);
   if (value.key) process.stdout.write(`${value.key}: ${JSON.stringify(value.value)}\n`);
   else if (value.config) process.stdout.write(`${JSON.stringify(value.config, null, 2)}\n`);
+  if (value.workItems) {
+    for (const item of value.workItems) {
+      process.stdout.write(`${item.changed ? "shared" : "unchanged"} ${item.work}\n`);
+      if (item.warning) process.stdout.write(`warning: ${item.warning}\n`);
+    }
+  }
   if (value.conflicts?.length) process.stdout.write(`conflicts: ${value.conflicts.join(", ")}\n`);
   if (value.files) {
     for (const file of value.files) process.stdout.write(`${file.status.padEnd(8)} ${file.path}\n`);

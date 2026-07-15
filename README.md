@@ -208,6 +208,7 @@ path when they need canonical journal memory.
 djournal status
 djournal doctor
 djournal config sync.enabled true
+djournal share --all
 djournal share
 djournal sync
 djournal upgrade
