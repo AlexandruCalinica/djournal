@@ -28,6 +28,16 @@ Mark a specific work item as shared:
 djournal share --work 2026-07-03-01-git-backed-journal-collaboration
 ```
 
+Mark every current work item as shared:
+
+```bash
+djournal share --all
+```
+
+Already-shared work keeps its original sharing record. `--all` marks only work
+items that currently exist in the canonical project store; it does not change
+the default for future work.
+
 Dry run:
 
 ```bash

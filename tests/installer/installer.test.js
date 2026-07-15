@@ -119,6 +119,49 @@ test("CLI parsing accepts share and sync work selection", () => {
   assert.equal(syncOptions.command, "sync");
   assert.equal(syncOptions.work, "2026-07-01-01-demo");
   assert.equal(syncOptions.auto, true);
+
+  const allShareOptions = parseArgs(["share", "--target", "/tmp/example", "--all"]);
+  assert.equal(allShareOptions.all, true);
+  assert.throws(() => parseArgs(["share", "--all", "--work", "2026-07-01-01-demo"]), /either --all or --work/);
+  assert.throws(() => parseArgs(["sync", "--all"]), /not supported for sync/);
+});
+
+test("share --all marks every canonical work item and preserves existing records", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "demo-all");
+  const slugs = ["2026-07-01-01-first", "2026-07-02-01-second"];
+  for (const slug of slugs) {
+    fs.mkdirSync(path.join(store, ".journal/work", slug), { recursive: true });
+    fs.writeFileSync(path.join(store, ".journal/work", slug, "work.md"), `---\nid: wi_${slug}\n---\n`);
+  }
+  fs.mkdirSync(path.join(store, ".journal/work/not-a-work-item"), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "demo-all", journalStore: store }));
+  const existing = { sharedAt: "2026-07-01T00:00:00.000Z", sharedBy: "original@local" };
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({
+    sync: { enabled: false, mode: "standalone", path: root },
+    sharing: { sharedWorkItems: { [slugs[0]]: existing } },
+  }));
+
+  const result = share({ target: root, all: true });
+
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.workItems.map((item) => item.work), slugs);
+  assert.deepEqual(result.workItems.map((item) => item.changed), [false, true]);
+  const shared = json(store, "config.json").sharing.sharedWorkItems;
+  assert.deepEqual(shared[slugs[0]], existing);
+  assert.equal(typeof shared[slugs[1]].sharedAt, "string");
+  assert.equal(shared["not-a-work-item"], undefined);
+
+  const repeated = share({ target: root, all: true });
+  assert.equal(repeated.changed, false);
+  assert.deepEqual(repeated.workItems.map((item) => item.changed), [false, false]);
+
+  const dryRunSlug = "2026-07-03-01-dry-run";
+  fs.mkdirSync(path.join(store, ".journal/work", dryRunSlug), { recursive: true });
+  fs.writeFileSync(path.join(store, ".journal/work", dryRunSlug, "work.md"), `---\nid: wi_${dryRunSlug}\n---\n`);
+  const dryRun = share({ target: root, all: true, dryRun: true });
+  assert.equal(dryRun.changed, true);
+  assert.equal(json(store, "config.json").sharing.sharedWorkItems[dryRunSlug], undefined);
 });
 
 test("global store config gates share projection and sync", () => {
