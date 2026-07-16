@@ -24,12 +24,13 @@ so.
 ```bash
 djournal uninstall --harness codex
 djournal uninstall --harness claude-code
+djournal uninstall --harness pi
 ```
 
 ## Uninstall multiple harnesses
 
 ```bash
-djournal uninstall --harness codex,claude-code
+djournal uninstall --harness codex,claude-code,pi
 ```
 
 Partial uninstall removes only the selected harness integration and keeps the
@@ -58,6 +59,7 @@ or select a harness:
 
 ```bash
 djournal install --harness codex
+djournal install --harness pi
 ```
 
 Reinstalling restores local harness integration around the existing journal

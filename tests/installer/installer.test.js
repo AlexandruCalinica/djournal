@@ -16,6 +16,7 @@ const {
   PROJECT_MARKER_PATH,
   configure,
   detectHarnesses,
+  doctor,
   install,
   loadManifest,
   selectHarnesses,
@@ -232,8 +233,8 @@ test("detection distinguishes supported and future harness evidence", () => {
   fs.mkdirSync(path.join(root, ".claude"));
   fs.mkdirSync(path.join(root, ".pi"));
   const detected = detectHarnesses(root, { commandExists: (name) => name === "codex" });
-  assert.deepEqual(detected.supported, ["codex", "claude-code"]);
-  assert.deepEqual(detected.future, ["pi"]);
+  assert.deepEqual(detected.supported, ["codex", "claude-code", "pi"]);
+  assert.deepEqual(detected.future, []);
 });
 
 test("non-interactive ambiguous detection requires explicit selection", async () => {
@@ -243,7 +244,11 @@ test("non-interactive ambiguous detection requires explicit selection", async ()
   );
 });
 
-test("both-harness install is idempotent and partial/full uninstall preserves user content", async () => {
+test("--all selects every supported harness including Pi", async () => {
+  assert.deepEqual(await selectHarnesses({ all: true }, { supported: [] }), ["codex", "claude-code", "pi"]);
+});
+
+test("three-harness install is idempotent and partial/full uninstall preserves user content", async () => {
   const root = target();
   const agentsOriginal = "# Existing agents\n\nKeep this.\n";
   const claudeOriginal = "# Existing Claude\n\nKeep this too.\n";
@@ -254,14 +259,18 @@ test("both-harness install is idempotent and partial/full uninstall preserves us
   fs.writeFileSync(path.join(root, ".codex/hooks.json"), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "user-codex" }] }] }, custom: true }));
   fs.writeFileSync(path.join(root, ".claude/settings.json"), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "user-claude" }] }] }, permissions: { defaultMode: "ask" } }));
 
-  const options = { sourceRoot, target: root, harnesses: ["codex", "claude-code"], interactive: false };
+  const options = { sourceRoot, target: root, harnesses: ["codex", "claude-code", "pi"], interactive: false };
   const first = await install(options);
   assert.equal(first.action, "install");
-  assert.deepEqual(first.harnesses, ["claude-code", "codex"]);
+  assert.deepEqual(first.harnesses, ["claude-code", "codex", "pi"]);
   assert.equal(count(read(root, "AGENTS.md"), BEGIN), 1);
   assert.equal(count(read(root, "CLAUDE.md"), BEGIN), 1);
   assert.equal(json(root, ".codex/hooks.json").custom, true);
   assert.equal(json(root, ".claude/settings.json").permissions.defaultMode, "ask");
+  assert.equal(read(root, ".pi/extensions/djournal.ts"), read(sourceRoot, ".pi/extensions/djournal.ts"));
+  const piRecord = loadManifest(root).files.find((record) => record.path === ".pi/extensions/djournal.ts");
+  assert.equal(piRecord.mode, "copy");
+  assert.equal(piRecord.harness, "pi");
   assert.equal(fs.existsSync(path.join(root, ".journal/state.json")), false);
   const marker = json(root, PROJECT_MARKER_PATH);
   const claudeSettings = json(root, ".claude/settings.json");
@@ -284,7 +293,16 @@ test("both-harness install is idempotent and partial/full uninstall preserves us
   assert.equal(count(read(root, "AGENTS.md"), BEGIN), 1);
   assert.equal(json(root, ".codex/hooks.json").hooks.Stop.length, 2);
   assert.equal(status({ target: root }).clean, true);
+  const piCheck = doctor({ target: root }).checks.find((check) => check.name === ".pi/extensions/djournal.ts");
+  assert.equal(piCheck.ok, true);
+  assert.match(piCheck.detail, /clean; Pi project trust required/);
   assert.equal(json(root, ".claude/settings.json").permissions.additionalDirectories.filter((item) => item === marker.journalStore).length, 1);
+
+  const piPartial = uninstall({ target: root, harnesses: ["pi"] });
+  assert.equal(piPartial.action, "partial-uninstall");
+  assert.deepEqual(piPartial.harnesses, ["claude-code", "codex"]);
+  assert.equal(fs.existsSync(path.join(root, ".pi/extensions/djournal.ts")), false);
+  assert.equal(fs.existsSync(path.join(root, ".agents/adapters/pi/journal-hook.js")), true);
 
   const partial = uninstall({ target: root, harnesses: ["codex"] });
   assert.equal(partial.action, "partial-uninstall");
@@ -398,6 +416,32 @@ test("modified copied assets block upgrade and survive uninstall with ownership 
   assert.match(read(root, ".agents/rules/AUTOMATION.md"), /local modification/);
   const manifest = loadManifest(root);
   assert.deepEqual(manifest.files.map((record) => record.path), [".agents/rules/AUTOMATION.md"]);
+});
+
+test("Pi extension conflicts preserve user content and manifest ownership", async () => {
+  const occupied = target();
+  fs.mkdirSync(path.join(occupied, ".pi/extensions"), { recursive: true });
+  fs.writeFileSync(path.join(occupied, ".pi/extensions/djournal.ts"), "export default function userExtension() {}\n");
+  await assert.rejects(
+    install({ sourceRoot, target: occupied, harnesses: ["pi"], interactive: false }),
+    (error) => error instanceof InstallerError && error.code === "ASSET_CONFLICT",
+  );
+  assert.match(read(occupied, ".pi/extensions/djournal.ts"), /userExtension/);
+  assert.equal(fs.existsSync(path.join(occupied, MANIFEST_PATH)), false);
+
+  const root = target();
+  await install({ sourceRoot, target: root, harnesses: ["pi"], interactive: false });
+  fs.appendFileSync(path.join(root, ".pi/extensions/djournal.ts"), "\n// local modification\n");
+  assert.equal(status({ target: root }).clean, false);
+  assert.match(doctor({ target: root }).checks.find((check) => check.name === ".pi/extensions/djournal.ts").detail, /modified/);
+  await assert.rejects(
+    upgrade({ sourceRoot, target: root, interactive: false }),
+    (error) => error instanceof InstallerError && error.code === "ASSET_CONFLICT",
+  );
+  const result = uninstall({ target: root, harnesses: ["pi"] });
+  assert.deepEqual(result.conflicts, [".pi/extensions/djournal.ts"]);
+  assert.deepEqual(result.harnesses, ["pi"]);
+  assert.match(read(root, ".pi/extensions/djournal.ts"), /local modification/);
 });
 
 test("injected transaction failure rolls every file back", async () => {
