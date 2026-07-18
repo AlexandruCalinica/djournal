@@ -169,7 +169,7 @@ function handle(payload, options = {}) {
   if (match[1].toLowerCase() === "closed" && !validateClosedPath(root, match[2])) {
     return {
       decision: "block",
-      reason: "The journal-status closed marker must reference an existing repository-relative Markdown spine entry under .journal/work/<work>/journal/.",
+      reason: "The journal-status closed marker must reference an existing Markdown spine entry under the resolved journal root. In global-store projects, .journal/... paths resolve through .djournal.json.",
     };
   }
   if (match[1].toLowerCase() === "closed") {
