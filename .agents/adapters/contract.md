@@ -42,7 +42,8 @@ native payloads to these names.
 
 - Hooks are read-only.
 - `stop_hook_active: true` always permits stopping.
-- `closed` markers must resolve inside `.journal/work/` to an existing Markdown
-  spine entry.
+- `closed` markers must resolve to an existing Markdown spine entry under the
+  resolved journal root; `.journal/...` paths use `.djournal.json` when a
+  global project store is configured.
 - Adapters do not infer task meaning from file changes or unstable transcripts.
 - Adding a harness must not change `AUTOMATION.md` semantics.

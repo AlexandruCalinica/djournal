@@ -68,12 +68,15 @@ test("closed marker requires an existing spine entry", () => {
   assert.equal(invalid.decision, "block");
 });
 
-test("closed marker validates repo-relative projection when global store is configured", () => {
+test("closed marker validates global store without repo-local projection", () => {
   const { root, entry, work } = fixture();
   const store = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-store-"));
-  fs.mkdirSync(path.join(store, ".journal/work", work), { recursive: true });
+  const globalEntry = path.join(store, entry);
+  fs.rmSync(path.join(root, ".journal"), { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(globalEntry), { recursive: true });
   fs.writeFileSync(path.join(store, ".journal/state.json"), JSON.stringify({ active_work_name: work }));
   fs.writeFileSync(path.join(store, ".journal/work", work, "work.md"), "---\nid: wi_test\n---\n");
+  fs.writeFileSync(globalEntry, "---\nid: ent_test\nentryType: implementation\n---\n");
   fs.writeFileSync(path.join(root, ".djournal.json"), JSON.stringify({
     schemaVersion: 1,
     projectKey: "test",
