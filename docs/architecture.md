@@ -168,6 +168,12 @@ For Claude Code, install also injects a narrow permission grant into
 runtime sandbox, so Codex sessions must be launched with the global store path
 available when sandboxing would otherwise hide `~/.djournal`.
 
+Pi uses a trusted project extension at `.pi/extensions/djournal.ts`. A thin Pi
+adapter maps `session_start`, `before_agent_start`, and final `turn_end` events
+into the shared checker. Because Pi has no blocking stop hook,
+an invalid final marker causes at most one follow-up turn. Pi project trust is
+managed by Pi, and external sandboxes must expose the global store.
+
 ## Related docs
 
 - [Djournal in practice](djournal-in-practice.md)

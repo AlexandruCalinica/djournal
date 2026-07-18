@@ -33,7 +33,7 @@ Options:
   --yes                 Disable interactive harness selection
   --json                Emit JSON
   --work SLUG           Select a journal work item instead of active state
-  --harness LIST        Comma-separated codex,claude-code selection
+  --harness LIST        Comma-separated codex,claude-code,pi selection
   --all                 Select all work items for share, or every harness
   --instructions-only   Install core instructions without harness hooks
 `;

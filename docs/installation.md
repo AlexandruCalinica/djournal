@@ -42,6 +42,7 @@ This installs:
 
 - shared journal rules and skills under `.agents/`
 - harness-specific hook config when selected
+- a managed `.pi/extensions/djournal.ts` extension when Pi is selected
 - managed instruction blocks in `AGENTS.md` and/or `CLAUDE.md`
 - `.djournal.json`, which points to the global project store
 - for Claude Code installs, a narrow permission grant that lets the agent read
@@ -63,6 +64,12 @@ Codex sandbox permissions are controlled by the Codex runtime launch/config
 rather than `.codex/hooks.json`. The installed Codex hook resolves the global
 store through `.djournal.json`; if the Codex session is sandboxed, launch it
 with the generated journal store path available as a readable/writable root.
+
+Pi loads project `.agents/skills` and `.pi/extensions/` only after project
+trust. In interactive Pi, use `/trust` and restart the session. For print, JSON,
+or RPC runs without a stored trust decision, pass `--approve`. djournal does not
+edit Pi's trust file. Pi itself is not a filesystem sandbox; external containers
+or sandboxes must expose the global store referenced by `.djournal.json`.
 
 To share selected work through the product repository, enable colocated
 projection:
@@ -116,12 +123,13 @@ Install for one harness:
 ```bash
 djournal install --harness codex
 djournal install --harness claude-code
+djournal install --harness pi
 ```
 
 Install for multiple harnesses:
 
 ```bash
-djournal install --harness codex,claude-code
+djournal install --harness codex,claude-code,pi
 ```
 
 Install every supported harness:
@@ -144,7 +152,9 @@ djournal doctor
 ```
 
 `status` reports installed files and cleanliness. `doctor` checks the local
-environment and harness configuration.
+environment and harness configuration. For Pi it reports extension presence
+and reminds you that project trust is required; it does not inspect or change
+Pi's private trust state.
 
 ## Related docs
 

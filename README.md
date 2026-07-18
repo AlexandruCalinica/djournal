@@ -112,7 +112,7 @@ flowchart LR
 - `AGENTS.md` supplies portable workflow instructions.
 - Skills handle planning, research, decisions, documentation, recall, audit,
   reconciliation, and session closure.
-- Codex and Claude Code hooks provide reminders and closure validation.
+- Codex, Claude Code, and Pi integrations provide reminders and closure validation.
 - Hooks never create or modify semantic journal entries.
 - Read-only and trivial requests do not generate unnecessary ceremony.
 
@@ -166,12 +166,13 @@ djournal install
 ```
 
 The global install gives you the `djournal` and `journal` commands. The
-installer targets the current directory and detects Codex or Claude Code. Select
+installer targets the current directory and detects Codex, Claude Code, or Pi. Select
 explicitly when needed:
 
 ```bash
 djournal install --harness codex
 djournal install --harness claude-code
+djournal install --harness pi
 djournal install --all
 ```
 
@@ -202,6 +203,12 @@ commands used by the workflow. Codex uses runtime sandbox configuration for
 filesystem access, so sandboxed Codex sessions must include the generated store
 path when they need canonical journal memory.
 
+Pi loads the managed `.pi/extensions/djournal.ts` integration only after the
+project is trusted. Approve the project interactively with `/trust` and restart
+Pi, or use `pi --approve` for a non-interactive run. Pi has no built-in
+filesystem sandbox; when an external sandbox or container is used, expose the
+global store referenced by `.djournal.json`.
+
 ## Lifecycle
 
 ```bash
@@ -230,7 +237,7 @@ dedicated journal repository.
 
 ## Status
 
-Codex and Claude Code are supported. OpenCode, Pi, and Zed adapters are planned.
+Codex, Claude Code, and Pi are supported. OpenCode and Zed adapters are planned.
 
 Git-backed sharing and automatic sync are opt-in so local-only work remains
 private by default.
