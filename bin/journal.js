@@ -104,7 +104,10 @@ function print(value, json) {
   }
   if (value.conflicts?.length) process.stdout.write(`conflicts: ${value.conflicts.join(", ")}\n`);
   if (value.files) {
-    for (const file of value.files) process.stdout.write(`${file.status.padEnd(8)} ${file.path}\n`);
+    for (const file of value.files) {
+      if (typeof file === "string") process.stdout.write(`${file}\n`);
+      else process.stdout.write(`${file.status.padEnd(8)} ${file.path}\n`);
+    }
   }
   if (value.checks) {
     for (const check of value.checks) process.stdout.write(`${check.ok ? "ok" : "fail"} ${check.name}: ${check.detail}\n`);
@@ -144,4 +147,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseArgs };
+module.exports = { parseArgs, print };
