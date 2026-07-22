@@ -9,7 +9,7 @@ const test = require("node:test");
 const sourceRoot = path.resolve(__dirname, "../..");
 const djournalHome = fs.mkdtempSync(path.join(os.tmpdir(), "djournal-home-"));
 process.env.DJOURNAL_HOME = djournalHome;
-const { parseArgs } = require("../../bin/journal.js");
+const { parseArgs, print } = require("../../bin/journal.js");
 const {
   InstallerError,
   MANIFEST_PATH,
@@ -125,6 +125,34 @@ test("CLI parsing accepts share and sync work selection", () => {
   assert.equal(allShareOptions.all, true);
   assert.throws(() => parseArgs(["share", "--all", "--work", "2026-07-01-01-demo"]), /either --all or --work/);
   assert.throws(() => parseArgs(["sync", "--all"]), /not supported for sync/);
+});
+
+test("CLI human output prints sync file paths", () => {
+  const writes = [];
+  const originalWrite = process.stdout.write;
+  process.stdout.write = (chunk) => {
+    writes.push(String(chunk));
+    return true;
+  };
+  try {
+    print({
+      action: "sync",
+      target: "/tmp/example",
+      files: [
+        ".journal/work/2026-07-01-01-demo/work.md",
+        ".journal/work/2026-07-01-01-demo/journal/2026-07-01-01-demo.md",
+      ],
+    });
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+
+  assert.equal(writes.join(""), [
+    "sync: /tmp/example",
+    ".journal/work/2026-07-01-01-demo/work.md",
+    ".journal/work/2026-07-01-01-demo/journal/2026-07-01-01-demo.md",
+    "",
+  ].join("\n"));
 });
 
 test("share --all marks every canonical work item and preserves existing records", () => {
