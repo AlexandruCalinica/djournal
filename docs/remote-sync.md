@@ -124,6 +124,9 @@ Current behavior:
 
 Hook-triggered sync uses the same command path with `--auto` only when
 global config enables standalone automatic sync and the closed work is shared.
+The hook derives the work item from the validated closed marker path, so a
+response that closes `.journal/work/<slug>/journal/...` synchronizes that
+`<slug>` even if `state.json` currently selects a different active work item.
 
 ## Keep local state local
 

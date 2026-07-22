@@ -22,6 +22,14 @@ function fixture() {
   return { root, work, entry };
 }
 
+function writeWork(root, slug, body = "---\nid: wi_test\n---\n") {
+  const entry = `.journal/work/${slug}/journal/2026-07-01-01-test.md`;
+  fs.mkdirSync(path.dirname(path.join(root, entry)), { recursive: true });
+  fs.writeFileSync(path.join(root, `.journal/work/${slug}/work.md`), body);
+  fs.writeFileSync(path.join(root, entry), "---\nid: ent_test\nentryType: implementation\n---\n");
+  return entry;
+}
+
 function run(payload) {
   return handle(payload);
 }
@@ -109,6 +117,72 @@ test("closed team-shared work auto-syncs when standalone config enables auto", (
     { syncRunner: () => { called = true; return { status: 0, stdout: "ok" }; } },
   );
   assert.equal(called, true);
+  assert.match(output.hookSpecificOutput.additionalContext, /synchronized/);
+});
+
+test("closed marker work owns auto-sync when active work differs", () => {
+  const { root, work: active } = fixture();
+  const closed = "2026-07-02-01-closed-work";
+  const closedEntry = writeWork(root, closed, "---\nid: wi_closed\nvisibility: team_shared\n---\n");
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone", auto: true } }));
+  let args = [];
+  const output = handle(
+    { cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${closedEntry} -->` },
+    { syncRunner: (_command, nextArgs) => { args = nextArgs; return { status: 0, stdout: "ok" }; } },
+  );
+
+  assert.equal(active, "2026-07-01-01-test-work");
+  assert.deepEqual(args, ["sync", "--auto", "--work", closed]);
+  assert.match(output.hookSpecificOutput.additionalContext, /synchronized/);
+});
+
+test("unshared closed work does not auto-sync even when active work is shared", () => {
+  const { root, work: active } = fixture();
+  const closed = "2026-07-02-01-unshared-work";
+  const closedEntry = writeWork(root, closed);
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({
+    sync: { enabled: true, mode: "standalone", auto: true },
+    sharing: { sharedWorkItems: { [active]: { sharedAt: "2026-07-01T00:00:00.000Z", sharedBy: "test@local" } } },
+  }));
+  let called = false;
+  const output = handle(
+    { cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${closedEntry} -->` },
+    { syncRunner: () => { called = true; return { status: 0, stdout: "ok" }; } },
+  );
+
+  assert.deepEqual(output, {});
+  assert.equal(called, false);
+});
+
+test("global closed marker work owns auto-sync when active work differs", () => {
+  const { root } = fixture();
+  const store = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-store-"));
+  const active = "2026-07-01-01-active-work";
+  const closed = "2026-07-02-01-closed-work";
+  const closedEntry = `.journal/work/${closed}/journal/2026-07-01-01-test.md`;
+  fs.rmSync(path.join(root, ".journal"), { recursive: true, force: true });
+  fs.mkdirSync(path.join(store, ".journal/work", active), { recursive: true });
+  fs.writeFileSync(path.join(store, ".journal/state.json"), JSON.stringify({ active_work_name: active }));
+  fs.writeFileSync(path.join(store, ".journal/work", active, "work.md"), "---\nid: wi_active\n---\n");
+  fs.mkdirSync(path.dirname(path.join(store, closedEntry)), { recursive: true });
+  fs.writeFileSync(path.join(store, ".journal/work", closed, "work.md"), "---\nid: wi_closed\n---\n");
+  fs.writeFileSync(path.join(store, closedEntry), "---\nid: ent_test\nentryType: implementation\n---\n");
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({
+    sync: { enabled: true, mode: "standalone", auto: true },
+    sharing: { sharedWorkItems: { [closed]: { sharedAt: "2026-07-01T00:00:00.000Z", sharedBy: "test@local" } } },
+  }));
+  fs.writeFileSync(path.join(root, ".djournal.json"), JSON.stringify({
+    schemaVersion: 1,
+    projectKey: "test",
+    journalStore: store,
+  }));
+  let args = [];
+  const output = handle(
+    { cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${closedEntry} -->` },
+    { syncRunner: (_command, nextArgs) => { args = nextArgs; return { status: 0, stdout: "ok" }; } },
+  );
+
+  assert.deepEqual(args, ["sync", "--auto", "--work", closed]);
   assert.match(output.hookSpecificOutput.additionalContext, /synchronized/);
 });
 
