@@ -62,12 +62,22 @@ function activeWork(root) {
     const context = projectContext(root);
     const state = JSON.parse(fs.readFileSync(path.join(context.journalRoot, "state.json"), "utf8"));
     if (typeof state.active_work_name !== "string" || !state.active_work_name) return null;
-    const work = path.join(context.journalRoot, "work", state.active_work_name, "work.md");
+    return workBySlug(root, state.active_work_name);
+  } catch {
+    return null;
+  }
+}
+
+function workBySlug(root, slug) {
+  try {
+    if (typeof slug !== "string" || !slug || slug.includes("/") || slug.includes("\\") || slug === "." || slug === "..") return null;
+    const context = projectContext(root);
+    const work = path.join(context.journalRoot, "work", slug, "work.md");
     if (!fs.existsSync(work)) return null;
     const metadata = parseFrontmatter(fs.readFileSync(work, "utf8"));
     const config = readConfig(context);
-    const shared = config.sharing?.sharedWorkItems && Object.prototype.hasOwnProperty.call(config.sharing.sharedWorkItems, state.active_work_name);
-    return { slug: state.active_work_name, visibility: metadata.visibility || "local_only", shared: !!shared, path: work };
+    const shared = config.sharing?.sharedWorkItems && Object.prototype.hasOwnProperty.call(config.sharing.sharedWorkItems, slug);
+    return { slug, visibility: metadata.visibility || "local_only", shared: !!shared, path: work };
   } catch {
     return null;
   }
@@ -96,26 +106,50 @@ function context(event, message) {
   };
 }
 
-function validateClosedPath(root, value) {
-  if (!value) return false;
+function resolveClosedEntry(root, value) {
+  if (!value) return null;
   const relative = value.trim().replaceAll("\\", "/");
-  if (!relative.endsWith(".md") || path.isAbsolute(relative)) return false;
+  if (!relative.endsWith(".md") || path.isAbsolute(relative)) return null;
 
   const validSpineEntry = (resolved, journalRoot) => {
-    const workRoot = path.resolve(journalRoot, "work") + path.sep;
-    if (!resolved.startsWith(workRoot)) return false;
-    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) return false;
-    return resolved.split(path.sep).join("/").includes("/journal/");
+    const resolvedJournalRoot = path.resolve(journalRoot);
+    const workRoot = path.join(resolvedJournalRoot, "work");
+    const workRelative = path.relative(workRoot, resolved);
+    if (!workRelative || workRelative.startsWith("..") || path.isAbsolute(workRelative)) return null;
+    const parts = workRelative.split(path.sep);
+    if (parts.length < 3 || !parts[0] || parts[1] !== "journal") return null;
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) return null;
+    return { relative, resolved, journalRoot: resolvedJournalRoot, workSlug: parts[0] };
   };
 
-  const repoResolved = path.resolve(root, relative);
-  if (validSpineEntry(repoResolved, path.join(root, ".journal"))) return true;
-
   const context = projectContext(root);
-  const resolved = relative.startsWith(".journal/")
-    ? path.resolve(context.journalRoot, relative.slice(".journal/".length))
-    : path.resolve(root, relative);
-  return validSpineEntry(resolved, context.journalRoot);
+  const candidates = [];
+  if (context.global && relative.startsWith(".journal/")) {
+    candidates.push({
+      resolved: path.resolve(context.journalRoot, relative.slice(".journal/".length)),
+      journalRoot: context.journalRoot,
+    });
+  }
+  candidates.push({
+    resolved: path.resolve(root, relative),
+    journalRoot: path.join(root, ".journal"),
+  });
+  if (!context.global && relative.startsWith(".journal/")) {
+    candidates.push({
+      resolved: path.resolve(context.journalRoot, relative.slice(".journal/".length)),
+      journalRoot: context.journalRoot,
+    });
+  }
+
+  for (const candidate of candidates) {
+    const entry = validSpineEntry(candidate.resolved, candidate.journalRoot);
+    if (entry) return entry;
+  }
+  return null;
+}
+
+function validateClosedPath(root, value) {
+  return !!resolveClosedEntry(root, value);
 }
 
 function syncSharedWork(root, work, runner) {
@@ -166,14 +200,16 @@ function handle(payload, options = {}) {
     };
   }
 
-  if (match[1].toLowerCase() === "closed" && !validateClosedPath(root, match[2])) {
+  const status = match[1].toLowerCase();
+  const closedEntry = status === "closed" ? resolveClosedEntry(root, match[2]) : null;
+  if (status === "closed" && !closedEntry) {
     return {
       decision: "block",
       reason: "The journal-status closed marker must reference an existing Markdown spine entry under the resolved journal root. In global-store projects, .journal/... paths resolve through .djournal.json.",
     };
   }
-  if (match[1].toLowerCase() === "closed") {
-    const work = activeWork(root);
+  if (status === "closed") {
+    const work = workBySlug(root, closedEntry.workSlug);
     if ((work?.shared || work?.visibility === "team_shared") && shouldAutoSync(root)) {
       const result = syncSharedWork(root, work, options.syncRunner);
       if (!result.ok) {
@@ -200,4 +236,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { handle, parseFrontmatter, shouldAutoSync };
+module.exports = { handle, parseFrontmatter, resolveClosedEntry, shouldAutoSync };
