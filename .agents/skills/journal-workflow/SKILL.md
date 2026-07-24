@@ -18,10 +18,33 @@ the underlying journal skills.
 
 - Honor `journal: off` and finish with `<!-- journal-status: off -->`.
 - For read-only work, use `recall` or `resume` only when history matters. Do not
-  write an entry; finish with `<!-- journal-status: not-needed -->`.
+  write an entry; finish with `<!-- journal-status: not-needed -->` unless
+  recalled evidence materially affects current or closed work as described
+  below.
 - For trivial mutations, validate directly. Journal only when durable project
   state changed.
 - For meaningful mutations or durable knowledge work, follow the checkpoints.
+
+## Recall reinforcement
+
+Keep `recall` itself read-only. After a recall/resume answer, decide whether the
+retrieved evidence materially affects current journal work before finalizing:
+
+- Immaterial recall: answer from sources and finish `not-needed`.
+- Current closure in progress: pass the recalled source entries to `journal` so
+  the new spine entry links them with `references`, `relates_to`, or
+  `supersedes` as appropriate.
+- Explicit current/closed target: use `reinforce` to add conservative links or a
+  follow-up spine entry.
+- Accepted contradiction or replacement: use `decision` or `journal` to record
+  the correction and link the recalled evidence.
+
+Material evidence includes recalled sources that confirm a claim being recorded,
+contradict or supersede an existing entry, change status or next steps, or are
+explicitly requested by the user as evidence for current work.
+
+Do not guess the owning target when several entries could apply. Ask for the
+target or create a follow-up entry that states the ambiguity.
 
 ## Run checkpoints
 
@@ -30,7 +53,7 @@ the underlying journal skills.
 2. **Plan:** use `plan` for multi-phase, risky, cross-component, or
    decision-heavy implementation. Do not plan again when an accepted plan exists.
 3. **Support:** route durable evidence to `research-codebase`, `research-web`,
-   `decision`, or `document` as appropriate.
+   `decision`, `document`, or `reinforce` as appropriate.
 4. **Implement and validate:** make the requested changes and gather bounded,
    deterministic evidence.
 5. **Close:** check the latest spine entry for duplication, then use `journal`
