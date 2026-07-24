@@ -67,3 +67,19 @@ Include a Code References table only when current code was verified.
 
 When sources conflict, prefer newer evidence but describe the conflict. When no
 source supports a claim, state that the journal does not contain the answer.
+
+## Reinforcement signal
+
+Recall remains read-only. Do not modify entries, links, or state.
+
+When recalled evidence materially affects active or explicitly mentioned current
+work, add a brief `Reinforcement` note before the Sources table:
+
+- `none`: sources are informative only; finish with `not-needed`.
+- `candidate`: list source paths and the likely target entry/work when the
+  evidence confirms, contradicts, clarifies, supersedes, changes status/next
+  steps, or the user asked to connect it to current work.
+- `ambiguous`: list candidate source paths and say what target is unclear.
+
+The surrounding workflow, not recall, decides whether to call `journal`,
+`decision`, or `reinforce` before the final response.

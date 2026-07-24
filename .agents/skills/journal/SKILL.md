@@ -21,6 +21,8 @@ progress.
    unavailable.
 3. Read the latest spine entry and its project timeline when present.
 4. Identify research, docs, and decisions actually used this session.
+   Include recalled journal entries when recall materially affected the work
+   being closed.
 
 ## Gather evidence
 
@@ -28,6 +30,8 @@ Gather only facts relevant to the current session:
 
 - files changed and concise change summaries
 - validation commands, results, counts, and short redacted failure excerpts
+- recalled entry paths and IDs that materially confirmed, contradicted,
+  clarified, or superseded this session's work
 - decisions and rationale
 - commits and branch when Git is available
 - blockers, open questions, and concrete next steps
@@ -49,7 +53,8 @@ diffs, transcripts, environment dumps, secrets, or unbounded command output.
    - `source: manual`
    - accurate one- or two-sentence `summary`
    - identical `createdAt` and `updatedAt`
-6. Add outgoing `references` links only to supporting entries actually used.
+6. Add outgoing `references` links only to entries actually used, including
+   recalled spine or supporting entries that materially affected the session.
    Add `relates_to` or `supersedes` only when their semantics are explicit.
 7. Use this body, omitting empty optional sections:
 
