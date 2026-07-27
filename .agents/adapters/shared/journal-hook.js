@@ -130,6 +130,12 @@ function resolveClosedEntry(root, value) {
       journalRoot: context.journalRoot,
     });
   }
+  if (relative.startsWith("work/")) {
+    candidates.push({
+      resolved: path.resolve(context.journalRoot, relative),
+      journalRoot: context.journalRoot,
+    });
+  }
   candidates.push({
     resolved: path.resolve(root, relative),
     journalRoot: path.join(root, ".journal"),
@@ -205,7 +211,7 @@ function handle(payload, options = {}) {
   if (status === "closed" && !closedEntry) {
     return {
       decision: "block",
-      reason: "The journal-status closed marker must reference an existing Markdown spine entry under the resolved journal root. In global-store projects, .journal/... paths resolve through .djournal.json.",
+      reason: "The journal-status closed marker must reference an existing Markdown spine entry. Use .journal/work/<slug>/journal/<entry>.md; global-store projects resolve .journal/... through .djournal.json.",
     };
   }
   if (status === "closed") {

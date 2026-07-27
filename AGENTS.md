@@ -17,9 +17,12 @@ For every request:
 
 End every final response with exactly one hidden status marker:
 
-- `<!-- journal-status: closed <relative-entry-path> -->`
+- `<!-- journal-status: closed .journal/work/<slug>/journal/<entry>.md -->`
 - `<!-- journal-status: not-needed -->`
 - `<!-- journal-status: off -->`
 
-Use `closed` only after verifying that the referenced spine entry exists. Keep
-the marker as the final line so optional harness hooks can validate closure.
+Closed marker paths are always repository-relative logical `.journal/...`
+paths. In global-store projects, hooks resolve that prefix through
+`.djournal.json`. Use `closed` only after verifying that the referenced spine
+entry exists. Keep the marker as the final line so optional harness hooks can
+validate closure.
