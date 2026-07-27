@@ -43,7 +43,9 @@ native payloads to these names.
 - Hooks are read-only.
 - `stop_hook_active: true` always permits stopping.
 - `closed` markers must resolve to an existing Markdown spine entry under the
-  resolved journal root; `.journal/...` paths use `.djournal.json` when a
-  global project store is configured.
+  resolved journal root. Agents emit canonical repository-relative
+  `.journal/work/<slug>/journal/<entry>.md` paths; `.journal/...` uses
+  `.djournal.json` when a global project store is configured. The shared
+  checker may accept journal-root-relative `work/...` as a compatibility form.
 - Adapters do not infer task meaning from file changes or unstable transcripts.
 - Adding a harness must not change `AUTOMATION.md` semantics.

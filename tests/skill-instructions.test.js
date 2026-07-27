@@ -33,3 +33,16 @@ test("recall reinforcement is workflow-owned and recall remains read-only", () =
   assert.match(reinforce, /without turning recall into a writer/);
   assert.match(reinforce, /Closed body edits: avoid them/);
 });
+
+test("closed marker instructions use the canonical logical journal path", () => {
+  const agents = read("AGENTS.md");
+  const workflow = read(".agents/skills/journal-workflow/SKILL.md");
+  const contract = read(".agents/adapters/contract.md");
+
+  for (const instructions of [agents, workflow]) {
+    assert.match(instructions, /journal-status: closed \.journal\/work\/<slug>\/journal\/<entry>\.md/);
+  }
+  assert.match(agents, /global-store projects, hooks resolve that prefix through/);
+  assert.match(workflow, /Always emit the logical repository-relative `\.journal\/\.\.\.` path/);
+  assert.match(contract, /checker may accept journal-root-relative `work\/\.\.\.` as a compatibility form/);
+});

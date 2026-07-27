@@ -62,7 +62,9 @@ target or create a follow-up entry that states the ambiguity.
 ## Finish
 
 - After a successful close, verify the new spine path and end the response with
-  `<!-- journal-status: closed <relative-entry-path> -->`.
+  `<!-- journal-status: closed .journal/work/<slug>/journal/<entry>.md -->`.
+- Always emit the logical repository-relative `.journal/...` path, including
+  when `STATE.md` resolves the actual journal root through `.djournal.json`.
 - If no close was warranted, end with `<!-- journal-status: not-needed -->`.
 - Never claim closure when the referenced file does not exist.
 - Do not expose the marker as explanatory prose; leave it as the final line.

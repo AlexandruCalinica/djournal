@@ -72,6 +72,8 @@ test("closed marker requires an existing spine entry", () => {
   const { root, entry } = fixture();
   const valid = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${entry} -->` });
   assert.deepEqual(valid, {});
+  const compatible = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${entry.slice(".journal/".length)} -->` });
+  assert.deepEqual(compatible, {});
   const invalid = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: "Done\n<!-- journal-status: closed .journal/work/missing.md -->" });
   assert.equal(invalid.decision, "block");
 });
@@ -93,6 +95,8 @@ test("closed marker validates global store without repo-local projection", () =>
 
   const output = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${entry} -->` });
   assert.deepEqual(output, {});
+  const compatible = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: `Done\n<!-- journal-status: closed ${entry.slice(".journal/".length)} -->` });
+  assert.deepEqual(compatible, {});
 });
 
 test("closed team-shared work does not auto-sync without standalone config", () => {
