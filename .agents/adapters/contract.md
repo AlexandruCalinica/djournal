@@ -7,8 +7,8 @@ second workflow engine and do not own durable state.
 
 | Event | Adapter behavior |
 | --- | --- |
-| `session_start` | Inject the active work name and tell the agent to follow `AGENTS.md` |
-| `prompt_submit` | Remind the agent to classify the request; preserve explicit opt-out |
+| `session_start` | Pull configured standalone journal transport, then inject active work and `AGENTS.md` context |
+| `prompt_submit` | Pull for explicit journal-sync intent, remind the agent to classify the request, and preserve opt-out |
 | `mutation_observed` | Optional ephemeral reminder only; never write state |
 | `before_compact` | Optional reminder to preserve material state before context loss |
 | `stop` | Validate the final journal status marker and request one closure pass |
@@ -40,7 +40,8 @@ native payloads to these names.
 
 ## Invariants
 
-- Hooks are read-only.
+- Hooks do not create or edit semantic journal entries. They may delegate
+  configured pull/sync transport to the CLI.
 - `stop_hook_active: true` always permits stopping.
 - `closed` markers must resolve to an existing Markdown spine entry under the
   resolved journal root. Agents emit canonical repository-relative

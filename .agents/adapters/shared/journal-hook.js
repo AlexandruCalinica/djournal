@@ -158,9 +158,9 @@ function validateClosedPath(root, value) {
   return !!resolveClosedEntry(root, value);
 }
 
-function syncSharedWork(root, work, runner) {
+function runJournal(root, args, runner) {
   const run = runner || ((command, args, options) => spawnSync(command, args, options));
-  const result = run("journal", ["sync", "--auto", "--work", work.slug], {
+  const result = run("journal", args, {
     cwd: root,
     encoding: "utf8",
     timeout: 30000,
@@ -173,21 +173,42 @@ function syncSharedWork(root, work, runner) {
   return { ok: true, message: (result.stdout || "").trim() };
 }
 
+function requestsJournalSync(prompt) {
+  const match = prompt.match(/\b(?:sync|synchronize|pull)\s+(?:the\s+)?journal\b|\bjournal\s+(?:sync|synchronize|pull)\b/i);
+  if (!match) return false;
+  const prefix = prompt.slice(Math.max(0, match.index - 32), match.index);
+  return !/\b(?:do\s+not|don't|dont|not|without|avoid|skip)\b[^.!?]*$/i.test(prefix);
+}
+
 function handle(payload, options = {}) {
   const event = payload.hook_event_name;
   const root = findRoot(payload.cwd);
   if (!root) return {};
 
   if (event === "SessionStart") {
+    let pullMessage = "";
+    if (shouldAutoSync(root)) {
+      const result = runJournal(root, ["pull", "--auto"], options.journalRunner || options.syncRunner);
+      pullMessage = result.ok
+        ? " Journal pull completed before loading active work."
+        : ` Automatic journal pull failed: ${result.message}`;
+    }
     const work = activeWork(root);
     const suffix = work ? ` Active work: ${work.slug}.` : " No valid active work is selected.";
-    return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${suffix}`);
+    return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${pullMessage}${suffix}`);
   }
 
   if (event === "UserPromptSubmit") {
     const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
     if (/\bjournal\s*:\s*off\b/i.test(prompt)) {
       return context(event, "Journal opt-out applies to this request. End with the journal-status: off marker.");
+    }
+    if (requestsJournalSync(prompt)) {
+      const result = runJournal(root, ["pull"], options.journalRunner || options.syncRunner);
+      const pullMessage = result.ok
+        ? "The journal was pulled before handling this explicit synchronization request."
+        : `The requested journal pull failed and must be resolved before publication: ${result.message}`;
+      return context(event, `${pullMessage} Classify this request using the ambient journal workflow and run journal sync if publication was requested.`);
     }
     return context(event, "Classify this request using the ambient journal workflow. Close meaningful changed state before the final response, without adding ceremony to read-only or trivial work.");
   }
@@ -217,11 +238,11 @@ function handle(payload, options = {}) {
   if (status === "closed") {
     const work = workBySlug(root, closedEntry.workSlug);
     if ((work?.shared || work?.visibility === "team_shared") && shouldAutoSync(root)) {
-      const result = syncSharedWork(root, work, options.syncRunner);
+      const result = runJournal(root, ["sync", "--auto", "--work", work.slug], options.journalRunner || options.syncRunner);
       if (!result.ok) {
         return context(event, `Journal entry is closed and shared work automatic journal sync failed: ${result.message}`);
       }
-      return context(event, "Journal entry is closed and shared work was synchronized.");
+      return context(event, "Journal entry is closed; remote work was pulled before shared work was synchronized.");
     }
   }
   return {};
@@ -242,4 +263,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { handle, parseFrontmatter, resolveClosedEntry, shouldAutoSync };
+module.exports = { handle, parseFrontmatter, requestsJournalSync, resolveClosedEntry, shouldAutoSync };

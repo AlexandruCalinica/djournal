@@ -19,6 +19,7 @@ const {
   doctor,
   install,
   loadManifest,
+  pull,
   selectHarnesses,
   share,
   sourceInventory,
@@ -109,7 +110,7 @@ test("CLI parsing accepts multi-harness and lifecycle flags", () => {
   assert.throws(() => parseArgs(["install", "--all", "--harness", "codex"]), /either --all or --harness/);
 });
 
-test("CLI parsing accepts share and sync work selection", () => {
+test("CLI parsing accepts share, pull, and sync work selection", () => {
   const shareOptions = parseArgs(["share", "--target", "/tmp/example", "--work", "2026-07-01-01-demo", "--dry-run", "--json"]);
   assert.equal(shareOptions.command, "share");
   assert.equal(shareOptions.work, "2026-07-01-01-demo");
@@ -121,10 +122,16 @@ test("CLI parsing accepts share and sync work selection", () => {
   assert.equal(syncOptions.work, "2026-07-01-01-demo");
   assert.equal(syncOptions.auto, true);
 
+  const pullOptions = parseArgs(["pull", "--target=/tmp/example", "--work=2026-07-01-01-demo", "--dry-run"]);
+  assert.equal(pullOptions.command, "pull");
+  assert.equal(pullOptions.work, "2026-07-01-01-demo");
+  assert.equal(pullOptions.dryRun, true);
+
   const allShareOptions = parseArgs(["share", "--target", "/tmp/example", "--all"]);
   assert.equal(allShareOptions.all, true);
   assert.throws(() => parseArgs(["share", "--all", "--work", "2026-07-01-01-demo"]), /either --all or --work/);
   assert.throws(() => parseArgs(["sync", "--all"]), /not supported for sync/);
+  assert.throws(() => parseArgs(["pull", "--all"]), /not supported for pull/);
 });
 
 test("CLI human output prints sync file paths", () => {
@@ -233,6 +240,152 @@ test("global store config gates share projection and sync", () => {
   assert.equal(projected.skipped, undefined);
   assert.equal(fs.existsSync(path.join(root, ".journal/work/2026-07-01-01-demo/work.md")), true);
   assert.equal(fs.existsSync(path.join(root, ".journal/work/2026-07-01-01-demo/journal/2026-07-01-01-demo.md")), true);
+});
+
+test("pull hydrates remote-only work and later projection updates into the canonical store", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "pull-hydration");
+  const slug = "2026-07-01-01-remote";
+  fs.mkdirSync(path.join(root, ".journal/work", slug, "journal"), { recursive: true });
+  fs.mkdirSync(path.join(store, ".journal"), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "pull-hydration", journalStore: store }));
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({ sync: { enabled: true, mode: "colocated", path: root } }));
+  fs.writeFileSync(path.join(root, ".journal/work", slug, "work.md"), "---\nid: wi_remote\n---\n");
+  const entry = path.join(root, ".journal/work", slug, "journal/2026-07-01-01-entry.md");
+  fs.writeFileSync(entry, "first\n");
+
+  const initial = pull({ target: root });
+  assert.deepEqual(initial.workItems, [slug]);
+  assert.equal(read(store, `.journal/work/${slug}/journal/2026-07-01-01-entry.md`), "first\n");
+
+  fs.writeFileSync(entry, "second\n");
+  const updated = pull({ target: root });
+  assert.equal(updated.conflicts.length, 0);
+  assert.equal(read(store, `.journal/work/${slug}/journal/2026-07-01-01-entry.md`), "second\n");
+});
+
+test("pull preserves local edits and automatically merges non-overlapping concurrent edits", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "pull-merge");
+  const slug = "2026-07-01-01-merge";
+  const relative = `.journal/work/${slug}/journal/2026-07-01-01-entry.md`;
+  fs.mkdirSync(path.join(root, path.dirname(relative)), { recursive: true });
+  fs.mkdirSync(path.join(store, ".journal/work", slug, "journal"), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "pull-merge", journalStore: store }));
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({ sync: { enabled: true, mode: "colocated", path: root } }));
+  for (const base of [root, path.join(store)]) {
+    const journal = base === root ? path.join(root, ".journal") : path.join(store, ".journal");
+    fs.writeFileSync(path.join(journal, "work", slug, "work.md"), "---\nid: wi_merge\n---\n");
+    fs.writeFileSync(path.join(journal, "work", slug, "journal/2026-07-01-01-entry.md"), "first\nmiddle\nlast\n");
+  }
+  pull({ target: root });
+
+  fs.writeFileSync(path.join(store, relative), "local\nmiddle\nlast\n");
+  fs.writeFileSync(path.join(root, relative), "first\nmiddle\nremote\n");
+  const merged = pull({ target: root });
+
+  assert.equal(merged.conflicts.length, 0);
+  assert.equal(merged.files.find((file) => file.path === relative).status, "merged");
+  assert.equal(read(store, relative), "local\nmiddle\nremote\n");
+});
+
+test("pull reports overlapping edits without changing canonical content or advancing its baseline", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "pull-conflict");
+  const slug = "2026-07-01-01-conflict";
+  const relative = `.journal/work/${slug}/work.md`;
+  fs.mkdirSync(path.join(root, ".journal/work", slug), { recursive: true });
+  fs.mkdirSync(path.join(store, ".journal/work", slug), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "pull-conflict", journalStore: store }));
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({ sync: { enabled: true, mode: "colocated", path: root } }));
+  fs.writeFileSync(path.join(root, relative), "title: base\n");
+  fs.writeFileSync(path.join(store, relative), "title: base\n");
+  pull({ target: root });
+
+  fs.writeFileSync(path.join(store, relative), "title: local\n");
+  fs.writeFileSync(path.join(root, relative), "title: remote\n");
+  const conflict = pull({ target: root });
+
+  assert.equal(conflict.conflicts.length, 1);
+  assert.match(conflict.conflicts[0], /overlapping edits/);
+  assert.equal(read(store, relative), "title: local\n");
+});
+
+test("pull reports remote deletion instead of deleting canonical journal history", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "pull-deletion");
+  const slug = "2026-07-01-01-deletion";
+  const relative = `.journal/work/${slug}/journal/2026-07-01-01-entry.md`;
+  fs.mkdirSync(path.join(root, path.dirname(relative)), { recursive: true });
+  fs.mkdirSync(path.join(store, path.dirname(relative)), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "pull-deletion", journalStore: store }));
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({ sync: { enabled: true, mode: "colocated", path: root } }));
+  fs.writeFileSync(path.join(root, `.journal/work/${slug}/work.md`), "---\nid: wi_deletion\n---\n");
+  fs.writeFileSync(path.join(store, `.journal/work/${slug}/work.md`), "---\nid: wi_deletion\n---\n");
+  fs.writeFileSync(path.join(root, relative), "durable\n");
+  fs.writeFileSync(path.join(store, relative), "durable\n");
+  pull({ target: root });
+  fs.rmSync(path.join(root, relative));
+
+  const conflict = pull({ target: root });
+
+  assert.match(conflict.conflicts.join("\n"), /remote deletion requires manual review/);
+  assert.equal(read(store, relative), "durable\n");
+});
+
+test("standalone pull fast-forwards the projection before canonical reconciliation", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "pull-standalone");
+  const slug = "2026-07-01-01-standalone";
+  const relative = `.journal/work/${slug}/work.md`;
+  fs.mkdirSync(path.join(root, ".git"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".journal/work", slug), { recursive: true });
+  fs.mkdirSync(path.join(store, ".journal/work", slug), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "pull-standalone", journalStore: store }));
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone", path: root } }));
+  fs.writeFileSync(path.join(root, relative), "title: before\n");
+  fs.writeFileSync(path.join(store, relative), "title: before\n");
+  const calls = [];
+  const runner = (_command, args) => {
+    calls.push(args);
+    if (args.includes("rev-parse")) return { status: 0, stdout: `${root}\n`, stderr: "" };
+    if (args.includes("pull")) {
+      fs.writeFileSync(path.join(root, relative), "title: after\n");
+      return { status: 0, stdout: "updated\n", stderr: "" };
+    }
+    return { status: 0, stdout: "", stderr: "" };
+  };
+
+  const result = pull({ target: root, runner });
+
+  assert.equal(result.pulled, true);
+  assert.equal(read(store, relative), "title: after\n");
+  assert.equal(calls.some((args) => args.includes("pull")), true);
+});
+
+test("sync pulls projection changes before publishing canonical work", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "sync-pull-first");
+  const slug = "2026-07-01-01-sync";
+  const relative = `.journal/work/${slug}/work.md`;
+  fs.mkdirSync(path.join(root, ".journal/work", slug), { recursive: true });
+  fs.mkdirSync(path.join(store, ".journal/work", slug), { recursive: true });
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "sync-pull-first", journalStore: store }));
+  fs.writeFileSync(path.join(store, ".journal/state.json"), JSON.stringify({ active_work_name: slug }));
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({
+    sync: { enabled: true, mode: "colocated", path: root },
+    sharing: { sharedWorkItems: { [slug]: { sharedAt: "2026-07-01T00:00:00.000Z", sharedBy: "test@local" } } },
+  }));
+  fs.writeFileSync(path.join(root, relative), "---\nid: wi_sync\ntitle: base\n---\n");
+  fs.writeFileSync(path.join(store, relative), "---\nid: wi_sync\ntitle: base\n---\n");
+  pull({ target: root });
+  fs.writeFileSync(path.join(root, relative), "---\nid: wi_sync\ntitle: remote\n---\n");
+
+  const result = sync({ target: root });
+
+  assert.equal(result.pulled.conflicts.length, 0);
+  assert.equal(read(store, relative), "---\nid: wi_sync\ntitle: remote\n---\n");
+  assert.equal(read(root, relative), "---\nid: wi_sync\ntitle: remote\n---\n");
 });
 
 test("install bootstraps global project store and migrates durable journal content", async () => {

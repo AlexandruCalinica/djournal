@@ -46,3 +46,13 @@ test("closed marker instructions use the canonical logical journal path", () => 
   assert.match(workflow, /Always emit the logical repository-relative `\.journal\/\.\.\.` path/);
   assert.match(contract, /checker may accept journal-root-relative `work\/\.\.\.` as a compatibility form/);
 });
+
+test("work initialization and switching pull before enumerating canonical work", () => {
+  const init = read(".agents/skills/init-work/SKILL.md");
+  const switching = read(".agents/skills/switch/SKILL.md");
+
+  for (const instructions of [init, switching]) {
+    assert.match(instructions, /Run `djournal pull`/);
+    assert.match(instructions, /Stop and\s+report .*pull conflict/i);
+  }
+});

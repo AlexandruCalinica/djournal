@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "sh -c 'd=\"$PWD\"; while [ \"$d\" != / ] && [ ! -f \"$d/.agents/adapters/shared/journal-hook.js\" ]; do d=\"$(dirname \"$d\")\"; done; [ -f \"$d/.agents/adapters/shared/journal-hook.js\" ] || exit 0; exec node \"$d/.agents/adapters/shared/journal-hook.js\" --harness codex'",
-            "timeout": 10,
+            "timeout": 45,
             "statusMessage": "Loading journal workflow"
           }
         ]
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "sh -c 'd=\"$PWD\"; while [ \"$d\" != / ] && [ ! -f \"$d/.agents/adapters/shared/journal-hook.js\" ]; do d=\"$(dirname \"$d\")\"; done; [ -f \"$d/.agents/adapters/shared/journal-hook.js\" ] || exit 0; exec node \"$d/.agents/adapters/shared/journal-hook.js\" --harness codex'",
-            "timeout": 10
+            "timeout": 45
           }
         ]
       }
@@ -30,7 +30,7 @@
           {
             "type": "command",
             "command": "sh -c 'd=\"$PWD\"; while [ \"$d\" != / ] && [ ! -f \"$d/.agents/adapters/shared/journal-hook.js\" ]; do d=\"$(dirname \"$d\")\"; done; [ -f \"$d/.agents/adapters/shared/journal-hook.js\" ] || exit 0; exec node \"$d/.agents/adapters/shared/journal-hook.js\" --harness codex'",
-            "timeout": 10,
+            "timeout": 45,
             "statusMessage": "Checking journal closure"
           }
         ]

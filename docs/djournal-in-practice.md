@@ -18,6 +18,11 @@ At session start, the active work item gives the agent a compact context pack:
 This lets future sessions start from shaped history rather than broad
 exploration.
 
+When standalone automatic sync is enabled, session startup first pulls the
+Git-backed journal and reconciles it into canonical storage. Work initialization
+and switching also pull before enumerating available work, so a colleague can
+select work that was created remotely.
+
 ## Plan before risky work
 
 Use a plan entry when the work has multiple phases, cross-component effects, or
@@ -134,6 +139,15 @@ Explicit request:
 ```text
 Document how journal sync works for future contributors.
 ```
+
+To request an immediate team refresh and publication:
+
+```text
+Sync the journal.
+```
+
+The prompt hook pulls first, and the agent then runs the normal journal sync
+workflow when publication is requested.
 
 Inferred request:
 

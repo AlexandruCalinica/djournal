@@ -217,6 +217,7 @@ djournal doctor
 djournal config sync.enabled true
 djournal share --all
 djournal share
+djournal pull
 djournal sync
 djournal upgrade
 djournal uninstall
@@ -230,10 +231,11 @@ Existing `AGENTS.md` and `CLAUDE.md` files are never replaced. djournal adds an
 owned block, updates only that block, and removes only that block during
 uninstall; surrounding project instructions remain untouched.
 
-`share` marks the active work item in the global sharing index. `sync` is
-opt-in; in colocated mode it projects shared work into the product repository
-for normal commits, and in standalone mode it projects shared work into a
-dedicated journal repository.
+`share` marks the active work item in the global sharing index. `pull` hydrates
+the canonical global store from the Git-backed projection with conservative
+three-way reconciliation. `sync` pulls first, then projects and publishes
+shared work. Colocated mode leaves product-repository Git operations to the
+user; standalone mode performs the configured Git pull and push.
 
 ## Status
 

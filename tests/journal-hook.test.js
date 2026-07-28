@@ -42,10 +42,40 @@ test("session start reports active work from a nested cwd", () => {
   assert.match(output.hookSpecificOutput.additionalContext, new RegExp(work));
 });
 
+test("session start pulls before loading active work when standalone auto-sync is configured", () => {
+  const { root } = fixture();
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone", auto: true } }));
+  let args = [];
+  const output = handle(
+    { cwd: root, hook_event_name: "SessionStart" },
+    { journalRunner: (_command, nextArgs) => { args = nextArgs; return { status: 0, stdout: "ok" }; } },
+  );
+  assert.deepEqual(args, ["pull", "--auto"]);
+  assert.match(output.hookSpecificOutput.additionalContext, /pull completed/i);
+});
+
 test("prompt submit preserves explicit opt-out", () => {
   const { root } = fixture();
   const output = run({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: "journal: off fix this" });
   assert.match(output.hookSpecificOutput.additionalContext, /opt-out/);
+});
+
+test("explicit journal sync prompts pull before agent handling while negated prompts do not", () => {
+  const { root } = fixture();
+  let calls = 0;
+  let args = [];
+  const requested = handle(
+    { cwd: root, hook_event_name: "UserPromptSubmit", prompt: "Please sync the journal now." },
+    { journalRunner: (_command, nextArgs) => { calls += 1; args = nextArgs; return { status: 0, stdout: "ok" }; } },
+  );
+  assert.deepEqual(args, ["pull"]);
+  assert.match(requested.hookSpecificOutput.additionalContext, /was pulled/);
+
+  handle(
+    { cwd: root, hook_event_name: "UserPromptSubmit", prompt: "Do not sync the journal." },
+    { journalRunner: () => { calls += 1; return { status: 0, stdout: "ok" }; } },
+  );
+  assert.equal(calls, 1);
 });
 
 test("stop requests one pass when the marker is absent", () => {

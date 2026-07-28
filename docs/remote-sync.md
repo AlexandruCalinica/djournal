@@ -6,10 +6,11 @@ transport they use for code. There are two different modes:
 - colocated `.journal/` in a product repository
 - standalone journal repository for multi-repo or team-wide memory
 
-The `djournal sync` command is opt-in and intended for standalone journal
-repositories or colocated projections. The canonical journal stays in
-`~/.djournal/projects/<project-key>/`; sync copies explicitly shared work into
-the configured Git-backed projection.
+The `djournal pull` and `djournal sync` commands are opt-in and intended for
+standalone journal repositories or colocated projections. The canonical journal
+stays in `~/.djournal/projects/<project-key>/`. Pull hydrates that store from
+the projection; sync pulls first and then copies explicitly shared work back
+into the projection for publication.
 
 ## Colocated repository
 
@@ -102,7 +103,19 @@ from the sharing index does not remove it from Git history or teammates' clones.
 
 ## Synchronizing shared work
 
-Run sync manually:
+Pull every projected work item into canonical storage:
+
+```bash
+djournal pull
+```
+
+Or pull one work item:
+
+```bash
+djournal pull --work 2026-07-03-01-git-backed-journal-collaboration
+```
+
+Publish shared work:
 
 ```bash
 djournal sync
@@ -116,17 +129,41 @@ djournal sync --work 2026-07-03-01-git-backed-journal-collaboration
 
 Current behavior:
 
-- sync is skipped unless global `config.json` opts in
-- unshared work is skipped
-- colocated mode copies shared work into the configured product repo projection
-- standalone mode copies shared work and then uses conservative Git operations
-- unresolved journal conflicts stop sync
+- pull and sync are skipped unless global `config.json` opts in
+- standalone pull runs `git pull --ff-only` before canonical hydration
+- colocated pull hydrates from the current checkout but never pulls the product
+  repository itself
+- pull uses the prior synchronized projection as a three-way baseline
+- one-sided edits and non-overlapping text changes merge automatically
+- overlapping edits and remote deletions stop without changing canonical files
+- sync pulls first, skips unshared publication, then projects and pushes
+- Git staging and conflict checks are scoped to `.journal/work`
 
 Hook-triggered sync uses the same command path with `--auto` only when
 global config enables standalone automatic sync and the closed work is shared.
 The hook derives the work item from the validated closed marker path, so a
 response that closes `.journal/work/<slug>/journal/...` synchronizes that
 `<slug>` even if `state.json` currently selects a different active work item.
+
+Configured standalone automatic sync also pulls when a new chat/session starts.
+The `init-work` and `switch` workflows pull before enumerating work, and an
+explicit request such as “sync the journal” triggers a pull before the agent
+handles publication. Automatic hook failures are reported as bounded context;
+explicit pull/sync conflicts exit nonzero for manual resolution.
+
+## Conflict behavior
+
+Pull compares three versions of every durable work file:
+
+- the last successfully observed projection baseline
+- the canonical local file
+- the current projected remote file
+
+If only one side changed, that side is preserved. Non-overlapping concurrent
+text edits are merged. If the same lines changed incompatibly, or the remote
+deleted durable history, pull returns the conflicting logical paths and does not
+apply any canonical changes or advance the baseline. Resolve those files in the
+projection or canonical store, then rerun `djournal pull`.
 
 ## Keep local state local
 
@@ -135,6 +172,7 @@ local operational state unless a future workflow explicitly says otherwise:
 
 - `.journal/state.json`
 - `.journal/.install/`
+- the canonical store's `.sync/` reconciliation baseline
 - `.djournal.json` when the team does not want to share the local store pointer
 - local harness cache or runtime files
 
