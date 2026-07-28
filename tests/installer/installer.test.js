@@ -9,11 +9,12 @@ const test = require("node:test");
 const sourceRoot = path.resolve(__dirname, "../..");
 const djournalHome = fs.mkdtempSync(path.join(os.tmpdir(), "djournal-home-"));
 process.env.DJOURNAL_HOME = djournalHome;
-const { parseArgs, print } = require("../../bin/journal.js");
+const { launchUpdateRefresh, parseArgs, print } = require("../../bin/journal.js");
 const {
   InstallerError,
   MANIFEST_PATH,
   PROJECT_MARKER_PATH,
+  checkUpdates,
   configure,
   detectHarnesses,
   doctor,
@@ -28,6 +29,7 @@ const {
   uninstall,
   upgrade,
 } = require("../../lib/installer/index.js");
+const { writeCache } = require("../../lib/update-checker.js");
 const {
   BEGIN,
   END,
@@ -134,6 +136,27 @@ test("CLI parsing accepts share, pull, and sync work selection", () => {
   assert.throws(() => parseArgs(["pull", "--all"]), /not supported for pull/);
 });
 
+test("CLI parsing and detached refresh support update checks", () => {
+  const options = parseArgs(["update", "check", "--target=/tmp/example", "--passive", "--json"]);
+  assert.equal(options.command, "update");
+  assert.equal(options.subcommand, "check");
+  assert.equal(options.passive, true);
+  assert.equal(options.json, true);
+  assert.throws(() => parseArgs(["update"]), /requires the check subcommand/);
+
+  let invocation;
+  let unref = false;
+  const started = launchUpdateRefresh(options, (command, args, spawnOptions) => {
+    invocation = { command, args, spawnOptions };
+    return { unref: () => { unref = true; } };
+  });
+  assert.equal(started, true);
+  assert.equal(invocation.command, process.execPath);
+  assert.deepEqual(invocation.args.slice(1, 5), ["update", "check", "--refresh-cache", "--json"]);
+  assert.equal(invocation.spawnOptions.detached, true);
+  assert.equal(unref, true);
+});
+
 test("CLI human output prints sync file paths", () => {
   const writes = [];
   const originalWrite = process.stdout.write;
@@ -160,6 +183,68 @@ test("CLI human output prints sync file paths", () => {
     ".journal/work/2026-07-01-01-demo/journal/2026-07-01-01-demo.md",
     "",
   ].join("\n"));
+});
+
+test("CLI human output describes package and project updates", () => {
+  const writes = [];
+  const originalWrite = process.stdout.write;
+  process.stdout.write = (chunk) => {
+    writes.push(String(chunk));
+    return true;
+  };
+  try {
+    print({
+      action: "update-check",
+      cliVersion: "1.0.0",
+      projectVersion: "0.9.0",
+      latestVersion: "1.1.0",
+      updateAvailable: true,
+      projectUpdateAvailable: true,
+      checkedAt: "2026-07-28T12:00:00.000Z",
+    });
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+  const output = writes.join("");
+  assert.match(output, /update available: 1\.0\.0 -> 1\.1\.0/);
+  assert.match(output, /project upgrade available: 0\.9\.0 -> 1\.0\.0/);
+});
+
+test("explicit and passive update checks share cached registry state", async () => {
+  const root = target();
+  const cacheFile = path.join(root, "cache/update-check.json");
+  let fetches = 0;
+  const fetched = await checkUpdates({
+    target: root,
+    sourceRoot,
+    cacheFile,
+    now: Date.parse("2026-07-28T12:00:00.000Z"),
+    fetchImpl: async () => {
+      fetches += 1;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ "dist-tags": { latest: "0.2.0" } }),
+      };
+    },
+  });
+  assert.equal(fetched.cliVersion, "0.1.0");
+  assert.equal(fetched.latestVersion, "0.2.0");
+  assert.equal(fetched.updateAvailable, true);
+  assert.equal(fetched.refreshed, true);
+
+  const cached = await checkUpdates({
+    target: root,
+    sourceRoot,
+    cacheFile,
+    passive: true,
+    allowTest: true,
+    env: {},
+    now: Date.parse("2026-07-28T13:00:00.000Z"),
+  });
+  assert.equal(cached.updateAvailable, true);
+  assert.equal(cached.refreshNeeded, false);
+  assert.equal(fetches, 1);
 });
 
 test("share --all marks every canonical work item and preserves existing records", () => {
@@ -457,6 +542,7 @@ test("three-harness install is idempotent and partial/full uninstall preserves u
   const claudeSettings = json(root, ".claude/settings.json");
   assert.equal(claudeSettings.permissions.additionalDirectories.includes(marker.journalStore), true);
   assert.equal(claudeSettings.permissions.allow.includes("Bash(journal status:*)"), true);
+  assert.equal(claudeSettings.permissions.allow.includes("Bash(djournal update:*)"), true);
   assert.equal(
     claudeSettings.hooks.SessionStart[0].hooks[0].statusMessage,
     "Loading journal workflow",
@@ -507,6 +593,33 @@ test("three-harness install is idempotent and partial/full uninstall preserves u
   assert.equal(read(root, ".journal/work/example/work.md"), "history\n");
   assert.deepEqual(json(root, ".journal/state.json"), { active_work_name: "example" });
   assert.equal(fs.existsSync(path.join(root, MANIFEST_PATH)), false);
+});
+
+test("status distinguishes CLI, project assets, and cached npm availability", async () => {
+  const root = target();
+  const cacheFile = path.join(root, "cache/update-check.json");
+  await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
+  writeCache({
+    checkedAt: "2026-07-28T12:00:00.000Z",
+    latestVersion: "0.2.0",
+    distTag: "latest",
+  }, { cacheFile });
+
+  const current = status({ target: root, sourceRoot, cacheFile, env: {}, allowTest: true });
+  assert.equal(current.toolVersion, "0.1.0");
+  assert.equal(current.cliVersion, "0.1.0");
+  assert.equal(current.projectVersion, "0.1.0");
+  assert.equal(current.latestVersion, "0.2.0");
+  assert.equal(current.updateAvailable, true);
+  assert.equal(current.projectUpdateAvailable, false);
+
+  const manifest = json(root, MANIFEST_PATH);
+  manifest.toolVersion = "0.0.9";
+  fs.writeFileSync(path.join(root, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`);
+  const staleAssets = status({ target: root, sourceRoot, cacheFile, env: {}, allowTest: true });
+  assert.equal(staleAssets.toolVersion, "0.0.9");
+  assert.equal(staleAssets.projectVersion, "0.0.9");
+  assert.equal(staleAssets.projectUpdateAvailable, true);
 });
 
 test("upgrade and uninstall preserve user edits outside managed instruction blocks", async () => {

@@ -214,6 +214,7 @@ global store referenced by `.djournal.json`.
 ```bash
 djournal status
 djournal doctor
+djournal update check
 djournal config sync.enabled true
 djournal share --all
 djournal share
@@ -236,6 +237,12 @@ the canonical global store from the Git-backed projection with conservative
 three-way reconciliation. `sync` pulls first, then projects and publishes
 shared work. Colocated mode leaves product-repository Git operations to the
 user; standalone mode performs the configured Git pull and push.
+
+At session start, djournal reads a user-local npm release cache and reports a
+known CLI or project-asset update every session until it is installed. Stale
+release data is refreshed in the background at most once every 24 hours. Run
+`djournal update check` for an immediate check, or disable passive checks with
+`djournal config updates.enabled false` or `NO_UPDATE_NOTIFIER=1`.
 
 ## Status
 

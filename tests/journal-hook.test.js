@@ -54,6 +54,77 @@ test("session start pulls before loading active work when standalone auto-sync i
   assert.match(output.hookSpecificOutput.additionalContext, /pull completed/i);
 });
 
+test("session start repeats a cached package update notice until the CLI is current", () => {
+  const { root } = fixture();
+  let result = {
+    enabled: true,
+    cliVersion: "1.0.0",
+    latestVersion: "1.1.0",
+    updateAvailable: true,
+    projectUpdateAvailable: false,
+  };
+  const updateRunner = (_command, args) => {
+    assert.deepEqual(args, ["update", "check", "--passive", "--json"]);
+    return { status: 0, stdout: JSON.stringify(result) };
+  };
+
+  const first = handle({ cwd: root, hook_event_name: "SessionStart" }, { updateRunner, env: {} });
+  const second = handle({ cwd: root, hook_event_name: "SessionStart" }, { updateRunner, env: {} });
+  assert.match(first.hookSpecificOutput.additionalContext, /djournal 1\.1\.0 is available/);
+  assert.match(second.hookSpecificOutput.additionalContext, /djournal 1\.1\.0 is available/);
+
+  result = { ...result, cliVersion: "1.1.0", updateAvailable: false };
+  const current = handle({ cwd: root, hook_event_name: "SessionStart" }, { updateRunner, env: {} });
+  assert.doesNotMatch(current.hookSpecificOutput.additionalContext, /is available/);
+});
+
+test("session start repeats a project asset notice until djournal upgrade catches up", () => {
+  const { root } = fixture();
+  let projectVersion = "1.0.0";
+  const updateRunner = () => ({
+    status: 0,
+    stdout: JSON.stringify({
+      enabled: true,
+      cliVersion: "1.1.0",
+      projectVersion,
+      updateAvailable: false,
+      projectUpdateAvailable: projectVersion === "1.0.0",
+    }),
+  });
+  for (let index = 0; index < 2; index++) {
+    const output = handle({ cwd: root, hook_event_name: "SessionStart" }, { updateRunner, env: {} });
+    assert.match(output.hookSpecificOutput.additionalContext, /assets 1\.0\.0; CLI 1\.1\.0/);
+  }
+  projectVersion = "1.1.0";
+  const current = handle({ cwd: root, hook_event_name: "SessionStart" }, { updateRunner, env: {} });
+  assert.doesNotMatch(current.hookSpecificOutput.additionalContext, /project uses djournal assets/i);
+});
+
+test("session start checks updates after automatic pull and fails silently", () => {
+  const { root } = fixture();
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone", auto: true } }));
+  const calls = [];
+  handle(
+    { cwd: root, hook_event_name: "SessionStart" },
+    {
+      env: {},
+      journalRunner: () => { calls.push("pull"); return { status: 0, stdout: "ok" }; },
+      updateRunner: () => { calls.push("update"); return { status: 1, stderr: "offline" }; },
+    },
+  );
+  assert.deepEqual(calls, ["pull", "update"]);
+});
+
+test("session start honors update notification opt-outs", () => {
+  const { root } = fixture();
+  let calls = 0;
+  const updateRunner = () => { calls += 1; return { status: 0, stdout: "{}" }; };
+  handle({ cwd: root, hook_event_name: "SessionStart" }, { updateRunner, env: { NO_UPDATE_NOTIFIER: "1" } });
+  fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ updates: { enabled: false } }));
+  handle({ cwd: root, hook_event_name: "SessionStart" }, { updateRunner, env: {} });
+  assert.equal(calls, 0);
+});
+
 test("prompt submit preserves explicit opt-out", () => {
   const { root } = fixture();
   const output = run({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: "journal: off fix this" });

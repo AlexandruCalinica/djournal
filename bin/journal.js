@@ -3,8 +3,10 @@
 "use strict";
 
 const path = require("node:path");
+const { spawn } = require("node:child_process");
 const {
   InstallerError,
+  checkUpdates,
   configure,
   doctor,
   install,
@@ -29,6 +31,7 @@ function usage() {
   journal share [--target DIR] [--work SLUG | --all] [--dry-run] [--json]
   journal pull [--target DIR] [--work SLUG] [--dry-run] [--json]
   journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
+  journal update check [--target DIR] [--json]
 
 Options:
   --dry-run             Show the planned operation without writing
@@ -44,10 +47,14 @@ Options:
 function parseArgs(argv) {
   const args = [...argv];
   const command = args.shift();
-  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync"].includes(command)) {
+  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
+  if (command === "update") {
+    options.subcommand = args.shift();
+    if (options.subcommand !== "check") throw new InstallerError("update requires the check subcommand", "USAGE");
+  }
   while (args.length) {
     const arg = args.shift();
     if (arg === "--target") {
@@ -68,6 +75,8 @@ function parseArgs(argv) {
     else if (arg === "--auto") options.auto = true;
     else if (arg === "--yes") options.yes = true;
     else if (arg === "--json") options.json = true;
+    else if (arg === "--passive" && command === "update") options.passive = true;
+    else if (arg === "--refresh-cache" && command === "update") options.refreshCache = true;
     else if (arg === "--help" || arg === "-h") throw new InstallerError(usage(), "HELP");
     else if (command === "config" && !options.key) options.key = arg;
     else if (command === "config" && typeof options.value === "undefined") options.value = arg;
@@ -92,12 +101,27 @@ function print(value, json) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
     return;
   }
+  if (value.action === "update-check") {
+    process.stdout.write(`cli version: ${value.cliVersion || "unknown"}\n`);
+    if (value.projectVersion) process.stdout.write(`project assets: ${value.projectVersion}\n`);
+    process.stdout.write(`latest version: ${value.latestVersion || "unknown"}\n`);
+    if (value.updateAvailable) process.stdout.write(`update available: ${value.cliVersion} -> ${value.latestVersion}\n`);
+    else if (value.latestVersion) process.stdout.write("djournal CLI is up to date\n");
+    if (value.projectUpdateAvailable) process.stdout.write(`project upgrade available: ${value.projectVersion} -> ${value.cliVersion}\n`);
+    if (value.checkedAt) process.stdout.write(`checked: ${value.checkedAt}\n`);
+    return;
+  }
   if (value.action) process.stdout.write(`${value.action}: ${value.target}\n`);
   else if (typeof value.installed === "boolean") process.stdout.write(value.installed ? `installed: ${value.target}\n` : `not installed: ${value.target}\n`);
   else process.stdout.write(`${value.ok ? "ok" : "failed"}: ${value.target}\n`);
   if (value.harnesses) process.stdout.write(`harnesses: ${value.harnesses.join(", ") || "instructions-only"}\n`);
   if (value.key) process.stdout.write(`${value.key}: ${JSON.stringify(value.value)}\n`);
   else if (value.config) process.stdout.write(`${JSON.stringify(value.config, null, 2)}\n`);
+  if (value.cliVersion) process.stdout.write(`cli version: ${value.cliVersion}\n`);
+  if (value.projectVersion) process.stdout.write(`project assets: ${value.projectVersion}\n`);
+  if (value.latestVersion) process.stdout.write(`latest version: ${value.latestVersion}\n`);
+  if (value.updateAvailable) process.stdout.write("update available: yes\n");
+  if (value.projectUpdateAvailable) process.stdout.write("project upgrade available: yes\n");
   if (value.workItems) {
     for (const item of value.workItems) {
       process.stdout.write(`${item.changed ? "shared" : "unchanged"} ${item.work}\n`);
@@ -124,6 +148,28 @@ function exitCodeFor(code) {
   return 1;
 }
 
+function launchUpdateRefresh(options, runner = spawn) {
+  try {
+    const child = runner(process.execPath, [
+      __filename,
+      "update",
+      "check",
+      "--refresh-cache",
+      "--json",
+      "--target",
+      options.target,
+    ], {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, DJOURNAL_UPDATE_WORKER: "1" },
+    });
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
@@ -136,6 +182,10 @@ async function main() {
     else if (options.command === "share") result = share(options);
     else if (options.command === "pull") result = pull(options);
     else if (options.command === "sync") result = sync(options);
+    else if (options.command === "update") {
+      result = await checkUpdates(options);
+      if (result.refreshNeeded) result.backgroundRefreshStarted = launchUpdateRefresh(options);
+    }
     else result = doctor(options);
     print(result, options.json);
     if (result.ok === false || result.installed === false || result.clean === false || result.conflicts?.length) process.exitCode = 2;
@@ -150,4 +200,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseArgs, print };
+module.exports = { launchUpdateRefresh, parseArgs, print };
