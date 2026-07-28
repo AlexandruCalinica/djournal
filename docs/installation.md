@@ -79,11 +79,13 @@ djournal config sync.enabled true
 djournal config sync.mode colocated
 djournal config sync.path .
 djournal share --work 2026-07-03-01-example
+djournal pull --work 2026-07-03-01-example
 djournal sync --work 2026-07-03-01-example
 ```
 
-That copies the shared work item into `./.journal/work/...` so normal product
-repository commits can carry it.
+Pull hydrates canonical storage from the current product checkout. Sync pulls
+again, then copies the shared work item into `./.journal/work/...` so normal
+product repository commits can carry it.
 
 ## Multi-repository setup
 

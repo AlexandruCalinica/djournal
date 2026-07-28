@@ -51,7 +51,13 @@ or push for the configured mode.
 
 ## Sync and visibility
 
-Run sync:
+Hydrate canonical storage from the shared projection:
+
+```bash
+djournal pull
+```
+
+Then publish shared local work:
 
 ```bash
 djournal sync
@@ -75,9 +81,11 @@ djournal config sync.mode colocated
 djournal sync
 ```
 
-In colocated mode, sync copies shared work into the product repository
-projection. In standalone mode, sync copies shared work into the standalone
-journal repository and performs conservative Git operations.
+In colocated mode, pull reads the current product repository projection without
+performing product Git operations. In standalone mode, pull fast-forwards the
+journal repository before hydrating canonical storage. Sync always pulls first;
+it then copies shared work into the projection and, in standalone mode, commits
+and pushes it.
 
 ## Safety model
 

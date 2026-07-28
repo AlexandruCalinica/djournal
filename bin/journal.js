@@ -8,6 +8,7 @@ const {
   configure,
   doctor,
   install,
+  pull,
   share,
   sync,
   status,
@@ -26,6 +27,7 @@ function usage() {
   journal doctor [--target DIR] [--json]
   journal config [--target DIR] [KEY [VALUE]] [--dry-run] [--json]
   journal share [--target DIR] [--work SLUG | --all] [--dry-run] [--json]
+  journal pull [--target DIR] [--work SLUG] [--dry-run] [--json]
   journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
 
 Options:
@@ -42,7 +44,7 @@ Options:
 function parseArgs(argv) {
   const args = [...argv];
   const command = args.shift();
-  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "sync"].includes(command)) {
+  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
@@ -132,6 +134,7 @@ async function main() {
     else if (options.command === "status") result = status(options);
     else if (options.command === "config") result = configure(options);
     else if (options.command === "share") result = share(options);
+    else if (options.command === "pull") result = pull(options);
     else if (options.command === "sync") result = sync(options);
     else result = doctor(options);
     print(result, options.json);

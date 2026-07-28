@@ -158,9 +158,10 @@ questions.
 work such as resume, planning, research, decision capture, documentation,
 audit, reconciliation, and closure.
 
-Hooks remind agents about the workflow and validate final status markers. Hooks
-do not create semantic journal entries. When `.djournal.json` exists, hooks read
-active work and sync config from the global project store.
+Hooks remind agents about the workflow, delegate configured synchronization
+transport to the CLI, and validate final status markers. Hooks do not create
+semantic journal entries. When `.djournal.json` exists, hooks read active work
+and sync config from the global project store.
 
 For Claude Code, install also injects a narrow permission grant into
 `.claude/settings.json` for the exact global project store path and safe
@@ -173,6 +174,12 @@ adapter maps `session_start`, `before_agent_start`, and final `turn_end` events
 into the shared checker. Because Pi has no blocking stop hook,
 an invalid final marker causes at most one follow-up turn. Pi project trust is
 managed by Pi, and external sandboxes must expose the global store.
+
+Configured standalone session-start hooks invoke `djournal pull --auto` before
+loading active work. Explicit journal-sync prompt intent invokes a manual pull.
+Close hooks invoke `djournal sync --auto --work <slug>`, whose transport ordering
+is pull and reconcile, project canonical work, then commit and push. Hooks never
+implement reconciliation or write semantic entries themselves.
 
 ## Related docs
 
