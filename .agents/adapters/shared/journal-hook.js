@@ -97,6 +97,18 @@ function shouldAutoSync(root) {
   return config.enabled === true && config.auto === true && config.mode === "standalone";
 }
 
+function environmentFlag(value) {
+  return typeof value === "string" ? !["", "0", "false"].includes(value.toLowerCase()) : Boolean(value);
+}
+
+function shouldCheckUpdates(root, env = process.env, options = {}) {
+  const config = readConfig(projectContext(root));
+  if (config.updates?.enabled === false) return false;
+  if (environmentFlag(env.NO_UPDATE_NOTIFIER) || environmentFlag(env.CI)) return false;
+  if (!options.allowTest && (env.NODE_ENV === "test" || environmentFlag(env.NODE_TEST_CONTEXT))) return false;
+  return true;
+}
+
 function context(event, message) {
   return {
     hookSpecificOutput: {
@@ -173,6 +185,34 @@ function runJournal(root, args, runner) {
   return { ok: true, message: (result.stdout || "").trim() };
 }
 
+function runUpdateCheck(root, runner) {
+  const run = runner || ((command, args, options) => spawnSync(command, args, options));
+  const result = run("journal", ["update", "check", "--passive", "--json"], {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (result.error || result.status !== 0) return null;
+  try {
+    const value = JSON.parse(result.stdout || "");
+    return value && typeof value === "object" && value.enabled !== false ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateNotice(value) {
+  if (!value) return "";
+  const messages = [];
+  if (value.updateAvailable && value.cliVersion && value.latestVersion) {
+    messages.push(`djournal ${value.latestVersion} is available (CLI ${value.cliVersion}). Update the npm package, then run \`djournal upgrade\` in this project.`);
+  }
+  if (value.projectUpdateAvailable && value.projectVersion && value.cliVersion) {
+    messages.push(`This project uses djournal assets ${value.projectVersion}; CLI ${value.cliVersion} is installed. Run \`djournal upgrade\`.`);
+  }
+  return messages.length ? ` ${messages.join(" ")}` : "";
+}
+
 function requestsJournalSync(prompt) {
   const match = prompt.match(/\b(?:sync|synchronize|pull)\s+(?:the\s+)?journal\b|\bjournal\s+(?:sync|synchronize|pull)\b/i);
   if (!match) return false;
@@ -193,9 +233,14 @@ function handle(payload, options = {}) {
         ? " Journal pull completed before loading active work."
         : ` Automatic journal pull failed: ${result.message}`;
     }
+    const env = options.env || process.env;
+    const allowTest = typeof options.updateRunner === "function";
+    const updateMessage = shouldCheckUpdates(root, env, { allowTest })
+      ? updateNotice(runUpdateCheck(root, options.updateRunner))
+      : "";
     const work = activeWork(root);
     const suffix = work ? ` Active work: ${work.slug}.` : " No valid active work is selected.";
-    return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${pullMessage}${suffix}`);
+    return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${pullMessage}${updateMessage}${suffix}`);
   }
 
   if (event === "UserPromptSubmit") {
@@ -263,4 +308,13 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { handle, parseFrontmatter, requestsJournalSync, resolveClosedEntry, shouldAutoSync };
+module.exports = {
+  handle,
+  parseFrontmatter,
+  requestsJournalSync,
+  resolveClosedEntry,
+  runUpdateCheck,
+  shouldAutoSync,
+  shouldCheckUpdates,
+  updateNotice,
+};

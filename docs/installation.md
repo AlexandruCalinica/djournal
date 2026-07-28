@@ -151,12 +151,54 @@ djournal install --instructions-only
 ```bash
 djournal status
 djournal doctor
+djournal update check
 ```
 
-`status` reports installed files and cleanliness. `doctor` checks the local
-environment and harness configuration. For Pi it reports extension presence
-and reminds you that project trust is required; it does not inspect or change
-Pi's private trust state.
+`status` reports installed files, cleanliness, the executing CLI version, the
+project asset version, and cached npm release availability. `doctor` checks the
+local environment and harness configuration. For Pi it reports extension
+presence and reminds you that project trust is required; it does not inspect or
+change Pi's private trust state.
+
+## Update notifications
+
+djournal checks npm release metadata without delaying session startup. A
+session reads `update-check.json` under `DJOURNAL_HOME` (default:
+`~/.djournal/update-check.json`) and, when that cache is older than 24 hours,
+starts a bounded background refresh for a later session. Registry failures are
+silent in this passive path.
+
+When a cached release is newer than the executing CLI, every new session shows
+an update notice until the newer package is installed. When the CLI is newer
+than a project's installed hooks and rules, every new session instead—or
+additionally—reminds you to upgrade those project assets.
+
+Check immediately:
+
+```bash
+djournal update check
+djournal update check --json
+```
+
+For a global installation, update both layers:
+
+```bash
+npm install -g djournal@latest
+djournal upgrade
+```
+
+Passive checks are enabled by default. Configure the interval or disable them
+for a project:
+
+```bash
+djournal config updates.intervalHours 24
+djournal config updates.enabled false
+```
+
+Set `NO_UPDATE_NOTIFIER=1` to disable passive checks and notices for the current
+environment. CI and test environments skip them automatically. Explicit
+`djournal update check` commands still perform a foreground check and report
+errors.
 
 ## Related docs
 
