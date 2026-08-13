@@ -265,6 +265,7 @@ djournal is licensed under the [Apache License 2.0](LICENSE).
 
 - [Installation and repository layouts](docs/installation.md)
 - [Remote Git sync setup](docs/remote-sync.md)
+- [Read-only team journal access](docs/read-only-team-journal.md)
 - [Architecture and data model](docs/architecture.md)
 - [Visibility and sharing](docs/visibility-and-sharing.md)
 - [Djournal in practice](docs/djournal-in-practice.md)

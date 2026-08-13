@@ -181,5 +181,6 @@ The durable team memory is the work item content: `work.md`, `journal/`,
 
 ## Related docs
 
+- [Read-only team journal access](read-only-team-journal.md)
 - [Visibility and sharing](visibility-and-sharing.md)
 - [Architecture and data model](architecture.md)

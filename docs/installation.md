@@ -203,4 +203,5 @@ errors.
 ## Related docs
 
 - [Remote Git sync setup](remote-sync.md)
+- [Read-only team journal access](read-only-team-journal.md)
 - [Uninstalling and reinstalling](uninstalling.md)
