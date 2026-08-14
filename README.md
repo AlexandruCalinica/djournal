@@ -238,6 +238,16 @@ three-way reconciliation. `sync` pulls first, then projects and publishes
 shared work. Colocated mode leaves product-repository Git operations to the
 user; standalone mode performs the configured Git pull and push.
 
+Parallel sessions can bind themselves to different active work items:
+
+```bash
+djournal work list --active
+djournal work bind 2026-08-14-01-example --session "$DJOURNAL_SESSION_ID"
+```
+
+If several work items are active and no session binding exists, the session-start
+hook asks the agent to prompt for a choice instead of guessing from recency.
+
 At session start, djournal reads a user-local npm release cache and reports a
 known CLI or project-asset update every session until it is installed. Stale
 release data is refreshed in the background at most once every 24 hours. Run

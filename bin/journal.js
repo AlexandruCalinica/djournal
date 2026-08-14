@@ -7,9 +7,11 @@ const { spawn } = require("node:child_process");
 const {
   InstallerError,
   checkUpdates,
+  bindWork,
   configure,
   doctor,
   install,
+  listWork,
   pull,
   share,
   sync,
@@ -31,6 +33,8 @@ function usage() {
   journal share [--target DIR] [--work SLUG | --all] [--dry-run] [--json]
   journal pull [--target DIR] [--work SLUG] [--dry-run] [--json]
   journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
+  journal work list [--target DIR] [--active] [--json]
+  journal work bind SLUG [--target DIR] [--session ID] [--dry-run] [--json]
   journal update check [--target DIR] [--json]
 
 Options:
@@ -38,6 +42,8 @@ Options:
   --yes                 Disable interactive harness selection
   --json                Emit JSON
   --work SLUG           Select a journal work item instead of active state
+  --session ID          Bind a journal work item to a specific session
+  --active              Show only lifecycle-active work items for work list
   --harness LIST        Comma-separated codex,claude-code,pi selection
   --all                 Select all work items for share, or every harness
   --instructions-only   Install core instructions without harness hooks
@@ -47,13 +53,20 @@ Options:
 function parseArgs(argv) {
   const args = [...argv];
   const command = args.shift();
-  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update"].includes(command)) {
+  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update", "work"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
   if (command === "update") {
     options.subcommand = args.shift();
     if (options.subcommand !== "check") throw new InstallerError("update requires the check subcommand", "USAGE");
+  } else if (command === "work") {
+    options.subcommand = args.shift();
+    if (!["list", "bind"].includes(options.subcommand)) throw new InstallerError("work requires the list or bind subcommand", "USAGE");
+    if (options.subcommand === "bind") {
+      if (!args.length || args[0].startsWith("-")) throw new InstallerError("work bind requires a work slug", "USAGE");
+      options.work = args.shift();
+    }
   }
   while (args.length) {
     const arg = args.shift();
@@ -65,11 +78,16 @@ function parseArgs(argv) {
       if (!args.length) throw new InstallerError("--work requires a value", "USAGE");
       options.work = args.shift();
     } else if (arg.startsWith("--work=")) options.work = arg.slice(7);
+    else if (arg === "--session") {
+      if (!args.length) throw new InstallerError("--session requires a value", "USAGE");
+      options.session = args.shift();
+    } else if (arg.startsWith("--session=")) options.session = arg.slice(10);
     else if (arg === "--harness") {
       if (!args.length) throw new InstallerError("--harness requires a value", "USAGE");
       options.harnesses.push(...args.shift().split(",").filter(Boolean));
     } else if (arg.startsWith("--harness=")) options.harnesses.push(...arg.slice(10).split(",").filter(Boolean));
     else if (arg === "--all") options.all = true;
+    else if (arg === "--active") options.active = true;
     else if (arg === "--instructions-only") options.instructionsOnly = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--auto") options.auto = true;
@@ -90,6 +108,9 @@ function parseArgs(argv) {
   if (options.instructionsOnly && (options.all || options.harnesses.length)) {
     throw new InstallerError("--instructions-only cannot be combined with harness selection", "USAGE");
   }
+  if (options.active && !(command === "work" && options.subcommand === "list")) {
+    throw new InstallerError("--active is only supported for work list", "USAGE");
+  }
   options.target = path.resolve(options.target || process.cwd());
   options.sourceRoot = sourceRoot;
   options.interactive = !options.yes && process.stdin.isTTY && process.stdout.isTTY;
@@ -109,6 +130,18 @@ function print(value, json) {
     else if (value.latestVersion) process.stdout.write("djournal CLI is up to date\n");
     if (value.projectUpdateAvailable) process.stdout.write(`project upgrade available: ${value.projectVersion} -> ${value.cliVersion}\n`);
     if (value.checkedAt) process.stdout.write(`checked: ${value.checkedAt}\n`);
+    return;
+  }
+  if (value.action === "work-list") {
+    if (value.selected) process.stdout.write(`selected: ${value.selected}\n`);
+    for (const item of value.workItems || []) {
+      const marker = item.selected ? "*" : " ";
+      process.stdout.write(`${marker} ${item.slug} [${item.status}] ${item.title}\n`);
+    }
+    return;
+  }
+  if (value.action === "work-bind") {
+    process.stdout.write(`bound ${value.work} to session ${value.sessionHash}\n`);
     return;
   }
   if (value.action) process.stdout.write(`${value.action}: ${value.target}\n`);
@@ -182,6 +215,8 @@ async function main() {
     else if (options.command === "share") result = share(options);
     else if (options.command === "pull") result = pull(options);
     else if (options.command === "sync") result = sync(options);
+    else if (options.command === "work" && options.subcommand === "list") result = listWork(options);
+    else if (options.command === "work" && options.subcommand === "bind") result = bindWork(options);
     else if (options.command === "update") {
       result = await checkUpdates(options);
       if (result.refreshNeeded) result.backgroundRefreshStarted = launchUpdateRefresh(options);

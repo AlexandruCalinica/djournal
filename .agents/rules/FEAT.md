@@ -71,9 +71,11 @@ Allowed status values:
 Status updates preserve `createdAt`, update `updatedAt`, and never alter `id` or
 `slug`. Visibility changes require an explicit user request.
 
-Only one work item is selected as active in `<journal-root>/state.json`, but
-other work items may remain in `active` status. Active selection and lifecycle
-status are different concepts.
+Only one work item is selected as the fallback active work in
+`<journal-root>/state.json`, but other work items may remain in `active` status.
+Parallel sessions may bind themselves to different active work items through
+local session state. Active selection and lifecycle status are different
+concepts.
 
 ## Legacy work items
 

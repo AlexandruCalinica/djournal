@@ -18,6 +18,19 @@ At session start, the active work item gives the agent a compact context pack:
 This lets future sessions start from shaped history rather than broad
 exploration.
 
+When several work items are still `active`, a new session should choose the one
+it is working on before making meaningful changes. Bind a known session id to a
+work item:
+
+```bash
+djournal work list --active
+djournal work bind 2026-08-14-01-example --session "$DJOURNAL_SESSION_ID"
+```
+
+If no session id is available, the agent should ask which active work item to
+use and avoid guessing from recency. The global `state.json` selection remains a
+fallback for older workflows.
+
 When standalone automatic sync is enabled, session startup first pulls the
 Git-backed journal and reconciles it into canonical storage. Work initialization
 and switching also pull before enumerating available work, so a colleague can

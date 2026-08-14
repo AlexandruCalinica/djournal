@@ -5,6 +5,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const crypto = require("node:crypto");
 
 const MARKER = /<!--\s*journal-status:\s*(closed|not-needed|off)(?:\s+([^>]*?))?\s*-->\s*$/i;
 const PROJECT_MARKER_PATH = ".djournal.json";
@@ -47,25 +48,56 @@ function parseFrontmatter(text) {
 function projectContext(root) {
   try {
     const markerFile = path.join(root, PROJECT_MARKER_PATH);
-    if (!fs.existsSync(markerFile)) return { root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
+    if (!fs.existsSync(markerFile)) return { root, storeRoot: root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
     const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
-    if (!marker.journalStore) return { root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
+    if (!marker.journalStore) return { root, storeRoot: root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
     const store = path.resolve(marker.journalStore);
-    return { root, journalRoot: path.join(store, ".journal"), configFile: path.join(store, "config.json"), global: true };
+    return { root, storeRoot: store, journalRoot: path.join(store, ".journal"), configFile: path.join(store, "config.json"), global: true };
   } catch {
-    return { root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
+    return { root, storeRoot: root, journalRoot: path.join(root, ".journal"), configFile: path.join(root, ".journal", "config.json"), global: false };
   }
 }
 
-function activeWork(root) {
+function workMetadata(root, slug) {
+  const work = workBySlug(root, slug);
+  return work && work.status === "active" ? work : null;
+}
+
+function sessionId(payload, env = process.env) {
+  return payload.session_id || payload.sessionId || env.DJOURNAL_SESSION_ID || "";
+}
+
+function sessionBinding(context, id) {
+  if (typeof id !== "string" || !id.trim()) return null;
   try {
-    const context = projectContext(root);
-    const state = JSON.parse(fs.readFileSync(path.join(context.journalRoot, "state.json"), "utf8"));
-    if (typeof state.active_work_name !== "string" || !state.active_work_name) return null;
-    return workBySlug(root, state.active_work_name);
+    const file = path.join(context.storeRoot, "sessions", `${sha256(id.trim())}.json`);
+    const value = JSON.parse(fs.readFileSync(file, "utf8"));
+    return typeof value.activeWorkName === "string" ? value.activeWorkName : null;
   } catch {
     return null;
   }
+}
+
+function activeWork(root, options = {}) {
+  try {
+    const context = projectContext(root);
+    const bound = sessionBinding(context, options.sessionId);
+    if (bound) {
+      const work = workMetadata(root, bound);
+      if (work) return { work, source: "session" };
+    }
+    if (options.state === false) return null;
+    const state = JSON.parse(fs.readFileSync(path.join(context.journalRoot, "state.json"), "utf8"));
+    if (typeof state.active_work_name !== "string" || !state.active_work_name) return null;
+    const work = workBySlug(root, state.active_work_name);
+    return work ? { work, source: "state" } : null;
+  } catch {
+    return null;
+  }
+}
+
+function sha256(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 function workBySlug(root, slug) {
@@ -77,10 +109,42 @@ function workBySlug(root, slug) {
     const metadata = parseFrontmatter(fs.readFileSync(work, "utf8"));
     const config = readConfig(context);
     const shared = config.sharing?.sharedWorkItems && Object.prototype.hasOwnProperty.call(config.sharing.sharedWorkItems, slug);
-    return { slug, visibility: metadata.visibility || "local_only", shared: !!shared, path: work };
+    return { slug, title: metadata.title || slug, status: metadata.status || "unknown", visibility: metadata.visibility || "local_only", shared: !!shared, path: work };
   } catch {
     return null;
   }
+}
+
+function activeWorkItems(root) {
+  try {
+    const context = projectContext(root);
+    const workRoot = path.join(context.journalRoot, "work");
+    if (!fs.existsSync(workRoot)) return [];
+    return fs.readdirSync(workRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink())
+      .map((entry) => workBySlug(root, entry.name))
+      .filter((work) => work?.status === "active")
+      .sort((left, right) => left.slug.localeCompare(right.slug));
+  } catch {
+    return [];
+  }
+}
+
+function selectionSuffix(root, payload, env) {
+  const id = sessionId(payload, env);
+  const selected = activeWork(root, { sessionId: id, state: false });
+  if (selected?.work) {
+    return ` Session-bound active work: ${selected.work.slug}.`;
+  }
+  const candidates = activeWorkItems(root);
+  if (candidates.length > 1) {
+    const list = candidates.map((work) => `${work.slug} (${work.title})`).join("; ");
+    return ` Multiple active work items are available: ${list}. Ask the user to choose one before meaningful work, then bind this session with \`djournal work bind <slug> --session <id>\` when a session id is available.`;
+  }
+  if (candidates.length === 1) return ` Active work: ${candidates[0].slug}.`;
+  const fallback = activeWork(root, { state: true });
+  if (fallback?.work) return ` Active work: ${fallback.work.slug}.`;
+  return " No valid active work is selected.";
 }
 
 function readConfig(context) {
@@ -238,8 +302,7 @@ function handle(payload, options = {}) {
     const updateMessage = shouldCheckUpdates(root, env, { allowTest })
       ? updateNotice(runUpdateCheck(root, options.updateRunner))
       : "";
-    const work = activeWork(root);
-    const suffix = work ? ` Active work: ${work.slug}.` : " No valid active work is selected.";
+    const suffix = selectionSuffix(root, payload, env);
     return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${pullMessage}${updateMessage}${suffix}`);
   }
 

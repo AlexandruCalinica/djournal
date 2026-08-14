@@ -42,6 +42,58 @@ test("session start reports active work from a nested cwd", () => {
   assert.match(output.hookSpecificOutput.additionalContext, new RegExp(work));
 });
 
+test("session start prompts when multiple active work items are available", () => {
+  const { root, work } = fixture();
+  fs.writeFileSync(path.join(root, `.journal/work/${work}/work.md`), [
+    "---",
+    "id: wi_test",
+    `slug: ${work}`,
+    "title: First Work",
+    "status: active",
+    "---",
+    "",
+  ].join("\n"));
+  const second = "2026-07-02-01-second-work";
+  writeWork(root, second, [
+    "---",
+    "id: wi_second",
+    `slug: ${second}`,
+    "title: Second Work",
+    "status: active",
+    "---",
+    "",
+  ].join("\n"));
+
+  const output = run({ cwd: root, hook_event_name: "SessionStart" });
+
+  assert.match(output.hookSpecificOutput.additionalContext, /Multiple active work items/);
+  assert.match(output.hookSpecificOutput.additionalContext, new RegExp(work));
+  assert.match(output.hookSpecificOutput.additionalContext, new RegExp(second));
+  assert.match(output.hookSpecificOutput.additionalContext, /Ask the user to choose one/);
+});
+
+test("session start uses a session-bound active work item", () => {
+  const { root, work } = fixture();
+  fs.writeFileSync(path.join(root, `.journal/work/${work}/work.md`), "---\nid: wi_test\ntitle: First Work\nstatus: active\n---\n");
+  const second = "2026-07-02-01-second-work";
+  writeWork(root, second, "---\nid: wi_second\ntitle: Second Work\nstatus: active\n---\n");
+  const crypto = require("node:crypto");
+  const session = "session-a";
+  const hash = crypto.createHash("sha256").update(session).digest("hex");
+  fs.mkdirSync(path.join(root, "sessions"), { recursive: true });
+  fs.writeFileSync(path.join(root, "sessions", `${hash}.json`), JSON.stringify({
+    schemaVersion: 1,
+    sessionHash: hash,
+    activeWorkName: second,
+    updatedAt: "2026-08-14T00:00:00.000Z",
+  }));
+
+  const output = run({ cwd: root, hook_event_name: "SessionStart", session_id: session });
+
+  assert.match(output.hookSpecificOutput.additionalContext, new RegExp(`Session-bound active work: ${second}`));
+  assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /Multiple active work items/);
+});
+
 test("session start pulls before loading active work when standalone auto-sync is configured", () => {
   const { root } = fixture();
   fs.writeFileSync(path.join(root, ".journal/config.json"), JSON.stringify({ sync: { enabled: true, mode: "standalone", auto: true } }));

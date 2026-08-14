@@ -23,6 +23,8 @@ const {
   detectHarnesses,
   doctor,
   install,
+  bindWork,
+  listWork,
   loadManifest,
   pull,
   selectHarnesses,
@@ -133,11 +135,26 @@ test("CLI parsing accepts share, pull, and sync work selection", () => {
   assert.equal(pullOptions.work, "2026-07-01-01-demo");
   assert.equal(pullOptions.dryRun, true);
 
+  const workListOptions = parseArgs(["work", "list", "--target=/tmp/example", "--active", "--json"]);
+  assert.equal(workListOptions.command, "work");
+  assert.equal(workListOptions.subcommand, "list");
+  assert.equal(workListOptions.active, true);
+  assert.equal(workListOptions.json, true);
+
+  const workBindOptions = parseArgs(["work", "bind", "2026-07-01-01-demo", "--session", "session-a", "--dry-run"]);
+  assert.equal(workBindOptions.command, "work");
+  assert.equal(workBindOptions.subcommand, "bind");
+  assert.equal(workBindOptions.work, "2026-07-01-01-demo");
+  assert.equal(workBindOptions.session, "session-a");
+  assert.equal(workBindOptions.dryRun, true);
+
   const allShareOptions = parseArgs(["share", "--target", "/tmp/example", "--all"]);
   assert.equal(allShareOptions.all, true);
   assert.throws(() => parseArgs(["share", "--all", "--work", "2026-07-01-01-demo"]), /either --all or --work/);
   assert.throws(() => parseArgs(["sync", "--all"]), /not supported for sync/);
   assert.throws(() => parseArgs(["pull", "--all"]), /not supported for pull/);
+  assert.throws(() => parseArgs(["work", "bind"]), /requires a work slug/);
+  assert.throws(() => parseArgs(["status", "--active"]), /only supported for work list/);
 });
 
 test("CLI parsing and detached refresh support update checks", () => {
@@ -287,6 +304,42 @@ test("share --all marks every canonical work item and preserves existing records
   const dryRun = share({ target: root, all: true, dryRun: true });
   assert.equal(dryRun.changed, true);
   assert.equal(json(store, "config.json").sharing.sharedWorkItems[dryRunSlug], undefined);
+});
+
+test("work list reports selected and lifecycle-active work items", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "work-list");
+  const first = "2026-07-01-01-first";
+  const second = "2026-07-02-01-second";
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "work-list", journalStore: store }));
+  fs.mkdirSync(path.join(store, ".journal/work", first), { recursive: true });
+  fs.mkdirSync(path.join(store, ".journal/work", second), { recursive: true });
+  fs.writeFileSync(path.join(store, ".journal/state.json"), JSON.stringify({ active_work_name: first }));
+  fs.writeFileSync(path.join(store, ".journal/work", first, "work.md"), "---\nid: wi_first\ntitle: First\nstatus: active\nvisibility: local_only\n---\n");
+  fs.writeFileSync(path.join(store, ".journal/work", second, "work.md"), "---\nid: wi_second\ntitle: Second\nstatus: paused\nvisibility: local_only\n---\n");
+
+  const all = listWork({ target: root });
+  assert.deepEqual(all.workItems.map((item) => item.slug), [first, second]);
+  assert.equal(all.workItems[0].selected, true);
+
+  const active = listWork({ target: root, active: true });
+  assert.deepEqual(active.workItems.map((item) => item.slug), [first]);
+});
+
+test("work bind stores a session-specific active work item", () => {
+  const root = target();
+  const store = path.join(djournalHome, "projects", "work-bind");
+  const slug = "2026-07-01-01-first";
+  fs.writeFileSync(path.join(root, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "work-bind", journalStore: store }));
+  fs.mkdirSync(path.join(store, ".journal/work", slug), { recursive: true });
+  fs.writeFileSync(path.join(store, ".journal/work", slug, "work.md"), "---\nid: wi_first\ntitle: First\nstatus: active\nvisibility: local_only\n---\n");
+
+  const result = bindWork({ target: root, work: slug, session: "session-a" });
+
+  assert.equal(result.work, slug);
+  const binding = json(store, `sessions/${result.sessionHash}.json`);
+  assert.equal(binding.activeWorkName, slug);
+  assert.equal(binding.sessionHash, result.sessionHash);
 });
 
 test("global store config gates share projection and sync", () => {

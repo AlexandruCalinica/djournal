@@ -52,8 +52,9 @@ Create one project-level work item. Work items may span repositories.
    <What outcome this work item exists to achieve.>
    ```
 
-10. Create or update `<journal-root>/state.json` to select the new slug. Preserve
-   the exact state shape from `STATE.md` and make the update safely.
+10. Create or update `<journal-root>/state.json` to select the new slug as the
+    global fallback work item. Preserve the exact state shape from `STATE.md`
+    and make the update safely.
 11. Re-read `work.md` and state. Verify slug, IDs, directories, timestamps,
     status, visibility, and JSON validity.
 
