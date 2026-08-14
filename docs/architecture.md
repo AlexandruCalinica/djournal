@@ -10,6 +10,7 @@ The canonical journal lives in the user's djournal home, keyed by project:
 ```text
 ~/.djournal/projects/<project-key>/
   config.json
+  sessions/          # local operational session bindings
   .journal/
     state.json
     work/<work-item>/
@@ -47,7 +48,13 @@ Every work item has:
 ```
 
 The frontmatter stores stable identity, title, status, visibility, authorship,
-and timestamps.
+and timestamps. Several work items may have lifecycle `status: active` at the
+same time.
+
+`state.json` stores the global fallback selected work item for backward
+compatibility. Parallel sessions can bind to a different active work item using
+local operational state under `sessions/`; those bindings are not durable
+journal history and are not projected into shared `.journal/` content.
 
 ## Configuration
 
@@ -160,8 +167,11 @@ audit, reconciliation, and closure.
 
 Hooks remind agents about the workflow, delegate configured synchronization
 transport to the CLI, and validate final status markers. Hooks do not create
-semantic journal entries. When `.djournal.json` exists, hooks read active work
-and sync config from the global project store.
+semantic journal entries. When `.djournal.json` exists, hooks read work context
+and sync config from the global project store. If a session binding exists, the
+hook reports that bound work item. If several work items are lifecycle-active and
+no binding exists, the hook asks the agent to prompt the user before meaningful
+work.
 
 For Claude Code, install also injects a narrow permission grant into
 `.claude/settings.json` for the exact global project store path and safe

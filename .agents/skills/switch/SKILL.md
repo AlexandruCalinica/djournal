@@ -5,7 +5,9 @@ description: Change the active filesystem journal work item without changing Git
 
 # Switch active work
 
-Switch journal context only. Work items are projects and are not Git branches.
+Switch the global fallback journal context only. Work items are projects and are
+not Git branches. For parallel sessions, prefer binding the session with
+`djournal work bind <slug> --session <id>` when a session id is available.
 
 ## Procedure
 
@@ -22,8 +24,8 @@ Switch journal context only. Work items are projects and are not Git branches.
 6. If already selected, report that and stop.
 7. Optionally inspect Git status read-only and mention uncommitted changes, but do
    not commit, stash, switch branches, or block the journal switch.
-8. Update `<journal-root>/state.json` atomically to the selected slug using the
-   exact shape in `STATE.md`.
+8. Update `<journal-root>/state.json` atomically to the selected fallback slug
+   using the exact shape in `STATE.md`.
 9. Re-read state and verify the target folder and `work.md` slug.
 10. Present the selected work's latest spine summary and next steps using the
    `resume` retrieval procedure.

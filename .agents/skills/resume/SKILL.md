@@ -15,8 +15,15 @@ Operate read-only.
    - `.agents/rules/LINKS.md`
    - `.agents/rules/SAFETY.md`
    - `.agents/rules/STATE.md`
-2. Resolve the journal root according to `STATE.md`; read `<journal-root>/state.json`,
-   then the active `work.md`.
+2. Resolve the journal root according to `STATE.md`; read active work
+   candidates under `<journal-root>/work/`, then resolve the session-bound work
+   item when the session has one, otherwise use `<journal-root>/state.json` only
+   as a fallback.
+   - If multiple work items have `status: active` and no valid session binding
+     is available, ask the user to choose one before doing meaningful writes.
+     After the user chooses, bind the session with
+     `djournal work bind <slug> --session <id>` when a session id is available,
+     or use `switch` only when the user wants to change the global fallback.
 3. If `work.md` is legacy/missing, infer a temporary title/slug and clearly mark
    metadata as incomplete. Do not repair it.
 4. Index entry frontmatter under `journal/`, `_research/`, `docs/`, and
