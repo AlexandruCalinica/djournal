@@ -5,8 +5,12 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const semver = require("semver");
 
 const sourceRoot = path.resolve(__dirname, "../..");
+const sourceVersion = JSON.parse(fs.readFileSync(path.join(sourceRoot, "package.json"), "utf8")).version;
+const newerVersion = semver.inc(sourceVersion, "minor");
+const olderVersion = semver.minVersion(`<${sourceVersion}`)?.version;
 const djournalHome = fs.mkdtempSync(path.join(os.tmpdir(), "djournal-home-"));
 process.env.DJOURNAL_HOME = djournalHome;
 const { launchUpdateRefresh, parseArgs, print } = require("../../bin/journal.js");
@@ -224,12 +228,12 @@ test("explicit and passive update checks share cached registry state", async () 
       return {
         ok: true,
         status: 200,
-        text: async () => JSON.stringify({ "dist-tags": { latest: "0.2.0" } }),
+        text: async () => JSON.stringify({ "dist-tags": { latest: newerVersion } }),
       };
     },
   });
-  assert.equal(fetched.cliVersion, "0.1.0");
-  assert.equal(fetched.latestVersion, "0.2.0");
+  assert.equal(fetched.cliVersion, sourceVersion);
+  assert.equal(fetched.latestVersion, newerVersion);
   assert.equal(fetched.updateAvailable, true);
   assert.equal(fetched.refreshed, true);
 
@@ -601,24 +605,24 @@ test("status distinguishes CLI, project assets, and cached npm availability", as
   await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
   writeCache({
     checkedAt: "2026-07-28T12:00:00.000Z",
-    latestVersion: "0.2.0",
+    latestVersion: newerVersion,
     distTag: "latest",
   }, { cacheFile });
 
   const current = status({ target: root, sourceRoot, cacheFile, env: {}, allowTest: true });
-  assert.equal(current.toolVersion, "0.1.0");
-  assert.equal(current.cliVersion, "0.1.0");
-  assert.equal(current.projectVersion, "0.1.0");
-  assert.equal(current.latestVersion, "0.2.0");
+  assert.equal(current.toolVersion, sourceVersion);
+  assert.equal(current.cliVersion, sourceVersion);
+  assert.equal(current.projectVersion, sourceVersion);
+  assert.equal(current.latestVersion, newerVersion);
   assert.equal(current.updateAvailable, true);
   assert.equal(current.projectUpdateAvailable, false);
 
   const manifest = json(root, MANIFEST_PATH);
-  manifest.toolVersion = "0.0.9";
+  manifest.toolVersion = olderVersion;
   fs.writeFileSync(path.join(root, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`);
   const staleAssets = status({ target: root, sourceRoot, cacheFile, env: {}, allowTest: true });
-  assert.equal(staleAssets.toolVersion, "0.0.9");
-  assert.equal(staleAssets.projectVersion, "0.0.9");
+  assert.equal(staleAssets.toolVersion, olderVersion);
+  assert.equal(staleAssets.projectVersion, olderVersion);
   assert.equal(staleAssets.projectUpdateAvailable, true);
 });
 
