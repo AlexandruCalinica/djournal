@@ -157,6 +157,27 @@ test("CLI parsing accepts share, pull, and sync work selection", () => {
   assert.throws(() => parseArgs(["status", "--active"]), /only supported for work list/);
 });
 
+test("CLI parsing accepts recall index, search, filters, and cache controls", () => {
+  const searchOptions = parseArgs([
+    "recall", "search", "persistent cache", "--target=/tmp/example", "--work", "2026-07-01-01-demo",
+    "--type=research,plan", "--kind", "entry", "--status=active", "--visibility", "local_only", "--limit", "5", "--no-cache", "--json",
+  ]);
+  assert.equal(searchOptions.command, "recall");
+  assert.equal(searchOptions.subcommand, "search");
+  assert.equal(searchOptions.query, "persistent cache");
+  assert.equal(searchOptions.limit, 5);
+  assert.equal(searchOptions.noCache, true);
+  assert.equal(searchOptions.json, true);
+
+  const indexOptions = parseArgs(["recall", "index", "--target", "/tmp/example", "--rebuild"]);
+  assert.equal(indexOptions.subcommand, "index");
+  assert.equal(indexOptions.rebuild, true);
+  assert.throws(() => parseArgs(["recall", "search"]), /requires a query/);
+  assert.throws(() => parseArgs(["recall", "search", "query", "--limit", "0"]), /integer from 1 to 100/);
+  assert.throws(() => parseArgs(["recall", "search", "query", "--rebuild"]), /only supported for recall index/);
+  assert.throws(() => parseArgs(["recall", "index", "--type", "research"]), /only supported for recall search/);
+});
+
 test("CLI parsing and detached refresh support update checks", () => {
   const options = parseArgs(["update", "check", "--target=/tmp/example", "--passive", "--json"]);
   assert.equal(options.command, "update");

@@ -19,6 +19,7 @@ const {
   uninstall,
   upgrade,
 } = require("../lib/installer/index.js");
+const { buildRecallIndex, searchRecall } = require("../lib/recall/index.js");
 
 const sourceRoot = path.resolve(__dirname, "..");
 
@@ -35,6 +36,8 @@ function usage() {
   journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
   journal work list [--target DIR] [--active] [--json]
   journal work bind SLUG [--target DIR] [--session ID] [--dry-run] [--json]
+  journal recall index [--target DIR] [--rebuild] [--no-cache] [--json]
+  journal recall search QUERY [--target DIR] [--work SLUG] [--type LIST] [--kind LIST] [--status LIST] [--visibility LIST] [--limit N] [--no-cache] [--json]
   journal update check [--target DIR] [--json]
 
 Options:
@@ -44,6 +47,13 @@ Options:
   --work SLUG           Select a journal work item instead of active state
   --session ID          Bind a journal work item to a specific session
   --active              Show only lifecycle-active work items for work list
+  --type LIST           Filter recall entries by comma-separated entry types
+  --kind LIST           Filter recall results by comma-separated work,entry kinds
+  --status LIST         Filter recall results by work-item status
+  --visibility LIST     Filter recall results by visibility
+  --limit N             Limit recall results per kind (1-100)
+  --rebuild             Rebuild the persistent recall cache from scratch
+  --no-cache            Search with an ephemeral in-memory index
   --harness LIST        Comma-separated codex,claude-code,pi selection
   --all                 Select all work items for share, or every harness
   --instructions-only   Install core instructions without harness hooks
@@ -53,7 +63,7 @@ Options:
 function parseArgs(argv) {
   const args = [...argv];
   const command = args.shift();
-  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update", "work"].includes(command)) {
+  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update", "work", "recall"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
@@ -66,6 +76,13 @@ function parseArgs(argv) {
     if (options.subcommand === "bind") {
       if (!args.length || args[0].startsWith("-")) throw new InstallerError("work bind requires a work slug", "USAGE");
       options.work = args.shift();
+    }
+  } else if (command === "recall") {
+    options.subcommand = args.shift();
+    if (!["index", "search"].includes(options.subcommand)) throw new InstallerError("recall requires the index or search subcommand", "USAGE");
+    if (options.subcommand === "search") {
+      if (!args.length || args[0].startsWith("-")) throw new InstallerError("recall search requires a query", "USAGE");
+      options.query = args.shift();
     }
   }
   while (args.length) {
@@ -82,6 +99,26 @@ function parseArgs(argv) {
       if (!args.length) throw new InstallerError("--session requires a value", "USAGE");
       options.session = args.shift();
     } else if (arg.startsWith("--session=")) options.session = arg.slice(10);
+    else if (arg === "--type") {
+      if (!args.length) throw new InstallerError("--type requires a value", "USAGE");
+      options.type = args.shift();
+    } else if (arg.startsWith("--type=")) options.type = arg.slice(7);
+    else if (arg === "--kind") {
+      if (!args.length) throw new InstallerError("--kind requires a value", "USAGE");
+      options.kind = args.shift();
+    } else if (arg.startsWith("--kind=")) options.kind = arg.slice(7);
+    else if (arg === "--status") {
+      if (!args.length) throw new InstallerError("--status requires a value", "USAGE");
+      options.status = args.shift();
+    } else if (arg.startsWith("--status=")) options.status = arg.slice(9);
+    else if (arg === "--visibility") {
+      if (!args.length) throw new InstallerError("--visibility requires a value", "USAGE");
+      options.visibility = args.shift();
+    } else if (arg.startsWith("--visibility=")) options.visibility = arg.slice(13);
+    else if (arg === "--limit") {
+      if (!args.length) throw new InstallerError("--limit requires a value", "USAGE");
+      options.limit = Number(args.shift());
+    } else if (arg.startsWith("--limit=")) options.limit = Number(arg.slice(8));
     else if (arg === "--harness") {
       if (!args.length) throw new InstallerError("--harness requires a value", "USAGE");
       options.harnesses.push(...args.shift().split(",").filter(Boolean));
@@ -93,6 +130,8 @@ function parseArgs(argv) {
     else if (arg === "--auto") options.auto = true;
     else if (arg === "--yes") options.yes = true;
     else if (arg === "--json") options.json = true;
+    else if (arg === "--rebuild" && command === "recall") options.rebuild = true;
+    else if (arg === "--no-cache" && command === "recall") options.noCache = true;
     else if (arg === "--passive" && command === "update") options.passive = true;
     else if (arg === "--refresh-cache" && command === "update") options.refreshCache = true;
     else if (arg === "--help" || arg === "-h") throw new InstallerError(usage(), "HELP");
@@ -110,6 +149,17 @@ function parseArgs(argv) {
   }
   if (options.active && !(command === "work" && options.subcommand === "list")) {
     throw new InstallerError("--active is only supported for work list", "USAGE");
+  }
+  if (command === "recall") {
+    if (typeof options.limit !== "undefined" && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 100)) {
+      throw new InstallerError("--limit must be an integer from 1 to 100", "USAGE");
+    }
+    if (options.rebuild && options.subcommand !== "index") throw new InstallerError("--rebuild is only supported for recall index", "USAGE");
+    if (options.subcommand === "index" && ["work", "type", "kind", "status", "visibility", "limit"].some((key) => typeof options[key] !== "undefined")) {
+      throw new InstallerError("recall filters are only supported for recall search", "USAGE");
+    }
+  } else if (["type", "kind", "status", "visibility", "limit", "rebuild", "noCache"].some((key) => typeof options[key] !== "undefined")) {
+    throw new InstallerError("recall filters are only supported for recall commands", "USAGE");
   }
   options.target = path.resolve(options.target || process.cwd());
   options.sourceRoot = sourceRoot;
@@ -144,6 +194,21 @@ function print(value, json) {
     process.stdout.write(`bound ${value.work} to session ${value.sessionHash}\n`);
     return;
   }
+  if (value.action === "recall-index") {
+    process.stdout.write(`recall index: ${value.cache.status} (${value.cache.mode})\n`);
+    process.stdout.write(`documents: ${value.cache.documentCount}\n`);
+    process.stdout.write(`elapsed: ${value.cache.totalMs.toFixed(1)} ms\n`);
+    for (const item of value.warnings || []) process.stdout.write(`warning: ${item.code}${item.path ? ` ${item.path}` : ""}${item.detail ? ` - ${item.detail}` : ""}\n`);
+    return;
+  }
+  if (value.action === "recall-search") {
+    process.stdout.write(`recall search: ${value.cache.status} (${value.cache.mode}), ${value.cache.totalMs.toFixed(1)} ms\n`);
+    for (const item of [...(value.workItems || []), ...(value.entries || [])]) {
+      process.stdout.write(`${item.score.toFixed(2).padStart(8)}  ${item.path}  ${item.title}\n`);
+    }
+    for (const item of value.warnings || []) process.stdout.write(`warning: ${item.code}${item.path ? ` ${item.path}` : ""}${item.detail ? ` - ${item.detail}` : ""}\n`);
+    return;
+  }
   if (value.action) process.stdout.write(`${value.action}: ${value.target}\n`);
   else if (typeof value.installed === "boolean") process.stdout.write(value.installed ? `installed: ${value.target}\n` : `not installed: ${value.target}\n`);
   else process.stdout.write(`${value.ok ? "ok" : "failed"}: ${value.target}\n`);
@@ -155,6 +220,10 @@ function print(value, json) {
   if (value.latestVersion) process.stdout.write(`latest version: ${value.latestVersion}\n`);
   if (value.updateAvailable) process.stdout.write("update available: yes\n");
   if (value.projectUpdateAvailable) process.stdout.write("project upgrade available: yes\n");
+  if (value.recallCache) {
+    const cache = value.recallCache;
+    process.stdout.write(`recall cache: ${cache.valid ? `${cache.documentCount} documents, ${cache.indexVersion}` : (cache.exists ? "invalid; rebuilds on next recall" : "not built")}\n`);
+  }
   if (value.workItems) {
     for (const item of value.workItems) {
       process.stdout.write(`${item.changed ? "shared" : "unchanged"} ${item.work}\n`);
@@ -217,6 +286,8 @@ async function main() {
     else if (options.command === "sync") result = sync(options);
     else if (options.command === "work" && options.subcommand === "list") result = listWork(options);
     else if (options.command === "work" && options.subcommand === "bind") result = bindWork(options);
+    else if (options.command === "recall" && options.subcommand === "index") result = buildRecallIndex(options);
+    else if (options.command === "recall" && options.subcommand === "search") result = searchRecall(options.query, options);
     else if (options.command === "update") {
       result = await checkUpdates(options);
       if (result.refreshNeeded) result.backgroundRefreshStarted = launchUpdateRefresh(options);
@@ -225,7 +296,7 @@ async function main() {
     print(result, options.json);
     if (result.ok === false || result.installed === false || result.clean === false || result.conflicts?.length) process.exitCode = 2;
   } catch (error) {
-    const code = error instanceof InstallerError ? error.code : "UNEXPECTED";
+    const code = error instanceof InstallerError ? error.code : (error?.code || "UNEXPECTED");
     if (process.argv.includes("--json")) {
       process.stderr.write(`${JSON.stringify({ ok: false, code, message: error.message }, null, 2)}\n`);
     } else process.stderr.write(`${code}: ${error.message}\n`);
