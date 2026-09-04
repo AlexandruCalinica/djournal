@@ -11,6 +11,7 @@ The canonical journal lives in the user's djournal home, keyed by project:
 ~/.djournal/projects/<project-key>/
   config.json
   sessions/          # local operational session bindings
+  cache/recall/       # disposable private recall index
   .journal/
     state.json
     work/<work-item>/
@@ -26,6 +27,29 @@ The installed project contains a marker that points back to that store:
 ```text
 .djournal.json
 ```
+
+## Recall index
+
+`djournal recall search` uses a serialized MiniSearch inverted index at
+`<project-store>/cache/recall/snapshot.json`. It indexes work metadata, entry
+metadata, headings, and body terms, while storing only the metadata needed to
+return explainable ranked paths. The complete Markdown body is not a stored
+result field, and every final answer still reads the selected canonical files.
+
+The snapshot is schema-, index-option-, and project-versioned. Each search compares a
+manifest of source paths, sizes, and modification times; changed work metadata
+reindexes its entries, and additions, edits, renames, and deletions are applied
+incrementally. Missing, incompatible, oversized, or malformed snapshots rebuild
+from Markdown. Writes use a private directory, a short-lived lock, and atomic
+rename. If persistence is unavailable, the same query runs with an ephemeral
+in-memory index.
+
+The cache is outside `.journal/`, is never shared, and may be removed at any
+time. `djournal recall index --rebuild` recreates it explicitly, while
+`djournal recall search "query" --no-cache` bypasses it for one invocation.
+Pull and sync do not block on prewarming: the next search performs authoritative
+reconciliation. This keeps publication latency predictable while preserving a
+warm snapshot whenever prior recall has already built one.
 
 When sync is enabled, a repository-local `.journal/` is a projection containing
 the shared work items copied out of the global store.

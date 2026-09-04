@@ -22,6 +22,14 @@ This still writes local files under the user's djournal home. "Read-only" means
 read-only with respect to the organization remote, not a filesystem mode that
 prevents local cache or canonical-store hydration.
 
+Recall also writes a private derived index under
+`~/.djournal/projects/<project-key>/cache/recall/`. It is not placed in the Git
+projection and is never published. Every CLI invocation loads the serialized
+index, checks source-file metadata, and incrementally refreshes only stale
+documents before searching; it does not keep a daemon or a process permanently
+in memory. If the local store is not writable, recall builds the index in memory
+for that invocation and returns results without attempting a remote write.
+
 ## Setup for a Non-Technical Reader
 
 Ask the organization admin for the team journal repository URL and read-only Git
@@ -37,6 +45,8 @@ djournal config sync.mode standalone
 djournal config sync.path .
 djournal config sync.auto false
 djournal pull
+djournal recall index
+djournal recall search "onboarding decisions"
 djournal status
 ```
 
@@ -59,6 +69,12 @@ djournal sync
 
 If read-only Git permissions are configured correctly, accidental pushes should
 fail at the remote even if someone runs a publication command.
+
+To avoid persistent local cache writes as well, add `--no-cache` to a recall
+search. To clear a persistent cache, delete only the project store's
+`cache/recall/` directory or run `djournal recall index --rebuild`; canonical
+journal history is unaffected. A malformed or incompatible cache is ignored and
+rebuilt automatically.
 
 ## Copy/Paste Agent Prompt
 

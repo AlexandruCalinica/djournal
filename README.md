@@ -248,6 +248,28 @@ djournal work bind 2026-08-14-01-example --session "$DJOURNAL_SESSION_ID"
 If several work items are active and no session binding exists, the session-start
 hook asks the agent to prompt for a choice instead of guessing from recency.
 
+## Fast recall
+
+Use recall directly as a search CLI:
+
+```bash
+djournal recall search "billing webhook retries"
+djournal recall search "billing webhook retries" --type decision,research --limit 5 --json
+```
+
+Or install a harness and ask its agent naturally: “Recall why we chose the
+current billing webhook retry strategy.” The bundled `recall` skill calls the
+same CLI, selects the best journal paths, reads the canonical Markdown, follows
+relevant links, and returns an evidence-backed answer.
+
+Recall uses a private, per-project MiniSearch snapshot to rank relevant work
+items and entry paths before reading canonical Markdown. Warm queries reuse the
+snapshot; additions, edits, deletes, and work-metadata changes refresh it on the
+next search. Use `--no-cache` for a one-call in-memory index. Cache corruption or
+write denial is recoverable and never triggers a share, sync, commit, or push.
+See [Fast recall](docs/recall.md) for standalone CLI examples, agent behavior,
+filters, and cache lifecycle details.
+
 At session start, djournal reads a user-local npm release cache and reports a
 known CLI or project-asset update every session until it is installed. Stale
 release data is refreshed in the background at most once every 24 hours. Run
@@ -274,6 +296,7 @@ djournal is licensed under the [Apache License 2.0](LICENSE).
 ## Documentation
 
 - [Installation and repository layouts](docs/installation.md)
+- [Fast recall: CLI and agent usage](docs/recall.md)
 - [Remote Git sync setup](docs/remote-sync.md)
 - [Read-only team journal access](docs/read-only-team-journal.md)
 - [Architecture and data model](docs/architecture.md)

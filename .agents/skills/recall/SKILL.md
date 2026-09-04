@@ -26,13 +26,17 @@ Default to Overview when unclear.
 
 ## Discover cheaply
 
-1. Resolve the journal root according to `STATE.md`. Enumerate
-   `<journal-root>/work/*/work.md`; use slug, title, description, status,
-   visibility, and metadata to rank candidate work items.
-2. For legacy work items, use folder names without rejecting them.
-3. Read entry frontmatter under `journal/`, `_research/`, `docs/`, and
-   `decisions/` for candidate work items. Build indexes by ID, type, timestamp,
-   title, summary, and links. Infer legacy values best-effort.
+1. Run `djournal recall search "<query>" --json` from the project. Add `--work`,
+   `--type`, `--status`, or `--visibility` only when the request supplies that
+   constraint. Use the ranked paths, IDs, matched fields, summaries, and links
+   to choose canonical files for deep reads. The cache is a disposable local
+   projection; never cite it instead of the Markdown source.
+2. If the command is unavailable, fails, or returns a recoverable cache warning
+   without results, resolve the journal root according to `STATE.md` and use the
+   canonical fallback: enumerate `<journal-root>/work/*/work.md`, rank work-item
+   metadata, then read entry frontmatter under `journal/`, `_research/`, `docs/`,
+   and `decisions/`. Infer legacy metadata best-effort.
+3. For legacy work items, use folder names without rejecting them.
 4. If no candidate matches, say so and list plausible work items. If more than
    three match, use their plan/latest summaries to narrow before deep reads.
 
