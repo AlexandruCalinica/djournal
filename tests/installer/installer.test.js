@@ -774,6 +774,34 @@ test("symlink destinations are rejected before writes", async () => {
   assert.equal(fs.existsSync(path.join(root, MANIFEST_PATH)), false);
 });
 
+test("upgrade adopts copied assets that already match the incoming version", async (t) => {
+  const root = target();
+  const incoming = target();
+  t.after(() => fs.rmSync(incoming, { recursive: true, force: true }));
+  for (const relative of [...sourceInventory(sourceRoot), "AGENTS.md", "package.json"]) {
+    const destination = path.join(incoming, relative);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(path.join(sourceRoot, relative), destination);
+  }
+  await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
+  const relative = ".agents/skills/recall/SKILL.md";
+  const originalRecord = loadManifest(root).files.find((record) => record.path === relative);
+  const updated = `${read(root, relative)}\nIncoming recall guidance.\n`;
+  fs.writeFileSync(path.join(incoming, relative), updated);
+  fs.writeFileSync(path.join(root, relative), updated);
+  assert.equal(status({ target: root }).clean, false);
+
+  await upgrade({ sourceRoot: incoming, target: root, interactive: false });
+
+  assert.equal(read(root, relative), updated);
+  const record = loadManifest(root).files.find((item) => item.path === relative);
+  assert.notEqual(record.installedHash, originalRecord.installedHash);
+  assert.equal(record.created, originalRecord.created);
+  assert.equal(status({ target: root }).clean, true);
+  await upgrade({ sourceRoot: incoming, target: root, interactive: false });
+  assert.deepEqual(loadManifest(root).files.find((item) => item.path === relative), record);
+});
+
 test("modified copied assets block upgrade and survive uninstall with ownership retained", async () => {
   const root = target();
   await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
