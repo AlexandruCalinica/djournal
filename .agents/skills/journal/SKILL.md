@@ -53,6 +53,10 @@ diffs, transcripts, environment dumps, secrets, or unbounded command output.
    - `source: manual`
    - accurate one- or two-sentence `summary`
    - identical `createdAt` and `updatedAt`
+   When known, include `metadata.codeReferences` for meaningful changed files
+   using `relation: changes`, or `mentions` for context-only references. Follow
+   the optional code-reference contract in `METADATA.md`; do not invent repository
+   labels or assert constraints from a changed-file list.
 6. Add outgoing `references` links only to entries actually used, including
    recalled spine or supporting entries that materially affected the session.
    Add `relates_to` or `supersedes` only when their semantics are explicit.

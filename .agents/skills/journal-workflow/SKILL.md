@@ -46,6 +46,22 @@ explicitly requested by the user as evidence for current work.
 Do not guess the owning target when several entries could apply. Ask for the
 target or create a follow-up entry that states the ambiguity.
 
+## Code-change evidence checkpoint
+
+For meaningful code changes, once intended paths are known, batch them through
+`djournal recall files <path>... --json` before editing. Read relevant canonical
+entries and decisions; distinguish exact references, directory scope, linked
+context, unscoped repositories, and superseded evidence. Completed work may still
+supply governing decisions. Do not treat a missing match as approval.
+
+After editing, query newly affected paths and compare the actual diff with the
+retrieved constraints. Avoid repeated calls for unchanged path sets within the
+same journal state, and do not add this ceremony to every file read or trivial
+edit. If the command is unavailable, use text recall/canonical reads and state
+the coverage limitation. Follow the existing decision workflow for an accepted
+intentional replacement; hooks do not decide contradictions or write entries.
+Pass materially used entries to the closing journal skill for typed citations.
+
 ## Run checkpoints
 
 1. **Start:** use `resume` when active-work history can affect the task. Use

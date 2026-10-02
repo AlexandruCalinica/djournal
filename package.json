@@ -27,7 +27,7 @@
     "benchmark:recall": "node scripts/benchmark-recall.cjs",
     "link:global": "npm link",
     "release": "semantic-release",
-    "test": "node tests/update-checker.test.js && node tests/journal-hook.test.js && node tests/pi-adapter.test.js && node tests/recall.test.js && node tests/installer/installer.test.js && node tests/release-policy.test.js && node tests/skill-instructions.test.js && npm run check:package",
+    "test": "node tests/update-checker.test.js && node tests/journal-hook.test.js && node tests/pi-adapter.test.js && node tests/recall.test.js && node tests/recall-files.test.js && node tests/installer/installer.test.js && node tests/release-policy.test.js && node tests/skill-instructions.test.js && npm run check:package",
     "prepublishOnly": "npm test"
   },
   "repository": {

@@ -19,7 +19,7 @@ const {
   uninstall,
   upgrade,
 } = require("../lib/installer/index.js");
-const { buildRecallIndex, searchRecall } = require("../lib/recall/index.js");
+const { buildRecallIndex, searchRecall, lookupFiles } = require("../lib/recall/index.js");
 
 const sourceRoot = path.resolve(__dirname, "..");
 
@@ -36,6 +36,7 @@ function usage() {
   journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
   journal work list [--target DIR] [--active] [--json]
   journal work bind SLUG [--target DIR] [--session ID] [--dry-run] [--json]
+  journal recall files PATH... [--target DIR] [--repository LABEL] [--work SLUG] [--limit N] [--no-cache] [--json]
   journal recall index [--target DIR] [--rebuild] [--no-cache] [--json]
   journal recall search QUERY [--target DIR] [--work SLUG] [--type LIST] [--kind LIST] [--status LIST] [--visibility LIST] [--limit N] [--no-cache] [--json]
   journal update check [--target DIR] [--json]
@@ -44,6 +45,7 @@ Options:
   --dry-run             Show the planned operation without writing
   --yes                 Disable interactive harness selection
   --json                Emit JSON
+  --repository LABEL    Scope code-path evidence to a repository label (files only)
   --work SLUG           Select a journal work item instead of active state
   --session ID          Bind a journal work item to a specific session
   --active              Show only lifecycle-active work items for work list
@@ -79,7 +81,7 @@ function parseArgs(argv) {
     }
   } else if (command === "recall") {
     options.subcommand = args.shift();
-    if (!["index", "search"].includes(options.subcommand)) throw new InstallerError("recall requires the index or search subcommand", "USAGE");
+    if (!["index", "search", "files"].includes(options.subcommand)) throw new InstallerError("recall requires the index, search, or files subcommand", "USAGE");
     if (options.subcommand === "search") {
       if (!args.length || args[0].startsWith("-")) throw new InstallerError("recall search requires a query", "USAGE");
       options.query = args.shift();
@@ -87,7 +89,13 @@ function parseArgs(argv) {
   }
   while (args.length) {
     const arg = args.shift();
-    if (arg === "--target") {
+    if (command === "recall" && options.subcommand === "files" && arg === "--") {
+      (options.paths ||= []).push(...args.splice(0));
+    } else if (arg === "--repository") {
+      if (!args.length || args[0].startsWith("--")) throw new InstallerError("--repository requires a label", "USAGE");
+      options.repository = args.shift();
+    } else if (arg.startsWith("--repository=")) options.repository = arg.slice(13);
+    else if (arg === "--target") {
       if (!args.length) throw new InstallerError("--target requires a value", "USAGE");
       options.target = args.shift();
     } else if (arg.startsWith("--target=")) options.target = arg.slice(9);
@@ -135,6 +143,7 @@ function parseArgs(argv) {
     else if (arg === "--passive" && command === "update") options.passive = true;
     else if (arg === "--refresh-cache" && command === "update") options.refreshCache = true;
     else if (arg === "--help" || arg === "-h") throw new InstallerError(usage(), "HELP");
+    else if (command === "recall" && options.subcommand === "files" && !arg.startsWith("-")) (options.paths ||= []).push(arg);
     else if (command === "config" && !options.key) options.key = arg;
     else if (command === "config" && typeof options.value === "undefined") options.value = arg;
     else throw new InstallerError(`unknown option: ${arg}`, "USAGE");
@@ -149,6 +158,12 @@ function parseArgs(argv) {
   }
   if (options.active && !(command === "work" && options.subcommand === "list")) {
     throw new InstallerError("--active is only supported for work list", "USAGE");
+  }
+  if (options.repository !== undefined && !(command === "recall" && options.subcommand === "files")) throw new InstallerError("--repository is only supported for recall files", "USAGE");
+  if (command === "recall" && options.subcommand === "files") {
+    const { normalizeInputs } = require("../lib/recall/files.js");
+    normalizeInputs(options.paths, { ...options, target: options.target || process.cwd() });
+    if (["type", "kind", "status", "visibility"].some(key => options[key] !== undefined)) throw new InstallerError("recall files supports --work and --repository filters", "USAGE");
   }
   if (command === "recall") {
     if (typeof options.limit !== "undefined" && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 100)) {
@@ -192,6 +207,23 @@ function print(value, json) {
   }
   if (value.action === "work-bind") {
     process.stdout.write(`bound ${value.work} to session ${value.sessionHash}\n`);
+    return;
+  }
+  if (value.action === "recall-files") {
+    process.stdout.write(`recall files: ${value.cache.status} (${value.cache.mode}), ${value.entries.length}/${value.totalEntries} entries\n`);
+    for (const entry of value.entries) {
+      process.stdout.write(`${entry.path}  ${entry.title}\n`);
+      for (const match of entry.matches) {
+        const detail = match.kind === "linked_context" ? `via ${match.viaPath}` : `${match.recordedPath} (${match.scope}, ${match.evidence.provenance})`;
+        process.stdout.write(`  ${match.inputPath}: ${match.kind} — ${detail}\n`);
+      }
+      for (const replacement of entry.supersededBy) process.stdout.write(`  superseded by: ${replacement.path}\n`);
+      if (entry.matchesTruncated || entry.codeReferencesTruncated || entry.supersededByTruncated) process.stdout.write("  additional entry evidence truncated\n");
+    }
+    if (value.unmatchedPaths.length) process.stdout.write(`no indexed evidence: ${value.unmatchedPaths.join(", ")}\n`);
+    if (value.truncated || value.relatedTruncated) process.stdout.write("results or linked context truncated; narrow paths or raise --limit\n");
+    for (const item of value.warnings) process.stdout.write(`warning: ${item.code}\n`);
+    process.stdout.write("Evidence candidates only; read canonical entries before assessing the change.\n");
     return;
   }
   if (value.action === "recall-index") {
@@ -286,6 +318,7 @@ async function main() {
     else if (options.command === "sync") result = sync(options);
     else if (options.command === "work" && options.subcommand === "list") result = listWork(options);
     else if (options.command === "work" && options.subcommand === "bind") result = bindWork(options);
+    else if (options.command === "recall" && options.subcommand === "files") result = lookupFiles(options.paths, options);
     else if (options.command === "recall" && options.subcommand === "index") result = buildRecallIndex(options);
     else if (options.command === "recall" && options.subcommand === "search") result = searchRecall(options.query, options);
     else if (options.command === "update") {
