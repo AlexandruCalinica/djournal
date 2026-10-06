@@ -52,12 +52,13 @@ djournal status
 
 Use `--instructions-only` when the person only needs portable journal skills and
 does not need editor-specific hooks. Use a harness install instead when they
-will use the journal from Codex, Claude Code, or Pi:
+will use the journal from Codex, Claude Code, Pi, or Grok Bot:
 
 ```bash
 djournal install --harness codex
 djournal install --harness claude-code
 djournal install --harness pi
+djournal install --harness grok-bot
 ```
 
 Do not run these commands in a read-only consumer setup:

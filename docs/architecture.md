@@ -209,6 +209,10 @@ into the shared checker. Because Pi has no blocking stop hook,
 an invalid final marker causes at most one follow-up turn. Pi project trust is
 managed by Pi, and external sandboxes must expose the global store.
 
+Grok Bot does not emit those events. Its install is the shared skills,
+`AGENTS.md`, and the recipe under `integrations/grok-bot/`. Skill registration
+and shell commands are the integration. See [Grok Bot](grok-bot.md).
+
 Configured standalone session-start hooks invoke `djournal pull --auto` before
 loading active work. Explicit journal-sync prompt intent invokes a manual pull.
 Close hooks invoke `djournal sync --auto --work <slug>`, whose transport ordering

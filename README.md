@@ -20,9 +20,9 @@ models, people, and tools.
 
 Long coding sessions do not survive tool boundaries well when the only handoff
 format is a transcript. A useful session may start in Codex, continue in Claude
-Code, and later resume somewhere else. The journal is the portable handoff
-layer: each agent can read the same Markdown spine, follow the same decisions
-and research links, and close its work in the same structure.
+Code or Grok Bot, and later resume in Pi or somewhere else. The journal is the
+portable handoff layer: each agent can read the same Markdown spine, follow the
+same decisions and research links, and close its work in the same structure.
 
 The memory belongs to the project, not to a chat session, model, harness,
 database, or proprietary service.
@@ -113,6 +113,7 @@ flowchart LR
 - Skills handle planning, research, decisions, documentation, recall, audit,
   reconciliation, and session closure.
 - Codex, Claude Code, and Pi integrations provide reminders and closure validation.
+- Grok Bot uses the same skills and instructions without session hooks.
 - Hooks never create or modify semantic journal entries.
 - Read-only and trivial requests do not generate unnecessary ceremony.
 
@@ -166,13 +167,14 @@ djournal install
 ```
 
 The global install gives you the `djournal` and `journal` commands. The
-installer targets the current directory and detects Codex, Claude Code, or Pi. Select
-explicitly when needed:
+installer targets the current directory and detects Codex, Claude Code, Pi, or
+a `.grokbot/` marker. Select explicitly when needed:
 
 ```bash
 djournal install --harness codex
 djournal install --harness claude-code
 djournal install --harness pi
+djournal install --harness grok-bot
 djournal install --all
 ```
 
@@ -208,6 +210,11 @@ project is trusted. Approve the project interactively with `/trust` and restart
 Pi, or use `pi --approve` for a non-interactive run. Pi has no built-in
 filesystem sandbox; when an external sandbox or container is used, expose the
 global store referenced by `.djournal.json`.
+
+Grok Bot has no session hooks. `djournal install --harness grok-bot` installs
+the shared skills and a Journal Hub recipe under `integrations/grok-bot/`.
+Register those skills in Grok, then let engineering bots journal themselves.
+See [Grok Bot](docs/grok-bot.md).
 
 ## Lifecycle
 
@@ -278,7 +285,7 @@ release data is refreshed in the background at most once every 24 hours. Run
 
 ## Status
 
-Codex, Claude Code, and Pi are supported. OpenCode and Zed adapters are planned.
+Codex, Claude Code, Pi, and Grok Bot are supported. OpenCode and Zed adapters are planned. Grok Bot is instruction and skill only.
 
 Git-backed sharing and automatic sync are opt-in so local-only work remains
 private by default.
@@ -296,6 +303,7 @@ djournal is licensed under the [Apache License 2.0](LICENSE).
 ## Documentation
 
 - [Installation and repository layouts](docs/installation.md)
+- [Grok Bot](docs/grok-bot.md)
 - [Fast recall: CLI and agent usage](docs/recall.md)
 - [Remote Git sync setup](docs/remote-sync.md)
 - [Read-only team journal access](docs/read-only-team-journal.md)

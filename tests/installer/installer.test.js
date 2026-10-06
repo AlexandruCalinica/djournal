@@ -588,8 +588,110 @@ test("non-interactive ambiguous detection requires explicit selection", async ()
   );
 });
 
-test("--all selects every supported harness including Pi", async () => {
-  assert.deepEqual(await selectHarnesses({ all: true }, { supported: [] }), ["codex", "claude-code", "pi"]);
+test("--all selects every supported harness including Pi and Grok Bot", async () => {
+  assert.deepEqual(await selectHarnesses({ all: true }, { supported: [] }), ["codex", "claude-code", "pi", "grok-bot"]);
+});
+
+test("grok aliases normalize and a grok binary is not detection evidence", async () => {
+  assert.deepEqual(
+    await selectHarnesses({ harnesses: ["grok", "grokbot", "grok-bot"] }, { supported: [] }),
+    ["grok-bot"],
+  );
+  const marked = target();
+  fs.mkdirSync(path.join(marked, ".grokbot"));
+  assert.deepEqual(
+    detectHarnesses(marked, { commandExists: () => false }).supported,
+    ["grok-bot"],
+  );
+  const bare = target();
+  assert.deepEqual(
+    detectHarnesses(bare, { commandExists: (name) => name === "grok" }).supported,
+    [],
+  );
+});
+
+test("grok-bot install copies the recipe without hook fragments and uninstalls only owned assets", async () => {
+  const root = target();
+  const planned = await install({
+    sourceRoot,
+    target: root,
+    harnesses: ["grok"],
+    interactive: false,
+    dryRun: true,
+  });
+  for (const relative of [
+    ".agents/rules/AUTOMATION.md",
+    ".agents/skills/journal/SKILL.md",
+    ".agents/adapters/contract.md",
+    "AGENTS.md",
+    ".grokbot/README.md",
+    "integrations/grok-bot/README.md",
+    "integrations/grok-bot/getting-started.md",
+    "integrations/grok-bot/skill-registration.md",
+    "integrations/grok-bot/checkup.md",
+    "integrations/grok-bot/peer-briefing.md",
+    PROJECT_MARKER_PATH,
+    MANIFEST_PATH,
+  ]) {
+    assert.equal(planned.operations.includes(relative), true, relative);
+  }
+  for (const relative of [".codex/hooks.json", ".claude/settings.json", "CLAUDE.md", ".pi/extensions/djournal.ts"]) {
+    assert.equal(planned.operations.includes(relative), false, relative);
+  }
+  assert.equal(fs.existsSync(path.join(root, "AGENTS.md")), false);
+
+  const installed = await install({ sourceRoot, target: root, harnesses: ["grok-bot"], interactive: false });
+  assert.deepEqual(installed.harnesses, ["grok-bot"]);
+  assert.equal(read(root, ".grokbot/README.md"), read(sourceRoot, ".grokbot/README.md"));
+  assert.equal(read(root, "integrations/grok-bot/skill-registration.md"), read(sourceRoot, "integrations/grok-bot/skill-registration.md"));
+  const owned = loadManifest(root).files.filter((record) => record.harness === "grok-bot");
+  assert.equal(owned.length > 0, true);
+  assert.equal(owned.every((record) => record.mode === "copy"), true);
+  assert.equal(fs.existsSync(path.join(root, ".codex/hooks.json")), false);
+  assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), false);
+  assert.equal(fs.existsSync(path.join(root, ".pi/extensions/djournal.ts")), false);
+
+  const health = doctor({ target: root, commandExists: () => false });
+  assert.equal(health.ok, true);
+  const byName = Object.fromEntries(health.checks.map((check) => [check.name, check]));
+  assert.equal(byName["grok-bot cli"].ok, true);
+  assert.match(byName["grok-bot cli"].detail, /not on PATH/);
+  assert.match(byName["grok-bot cli"].detail, /hooks are not used/);
+  assert.equal(byName["grok-bot agents"].ok, true);
+  assert.equal(byName["grok-bot marker"].ok, true);
+  assert.match(byName["grok-bot assets"].detail, /clean; instruction\/skill-only/);
+  assert.equal(byName[".codex/hooks.json"], undefined);
+  assert.equal(byName[".claude/settings.json"], undefined);
+  assert.equal(byName[".pi/extensions/djournal.ts"], undefined);
+
+  fs.writeFileSync(path.join(root, ".grokbot/local.txt"), "keep me\n");
+  const removed = uninstall({ target: root, harnesses: ["grokbot"] });
+  assert.equal(removed.action, "partial-uninstall");
+  assert.deepEqual(removed.harnesses, []);
+  assert.equal(fs.existsSync(path.join(root, ".grokbot/README.md")), false);
+  assert.equal(fs.existsSync(path.join(root, "integrations/grok-bot/README.md")), false);
+  assert.equal(read(root, ".grokbot/local.txt"), "keep me\n");
+  assert.equal(fs.existsSync(path.join(root, ".agents/rules/AUTOMATION.md")), true);
+  assert.equal(fs.existsSync(path.join(root, ".agents/skills/journal/SKILL.md")), true);
+});
+
+test("--all includes grok-bot assets and other harness hooks", async () => {
+  const root = target();
+  const result = await install({ sourceRoot, target: root, all: true, interactive: false });
+  assert.deepEqual(result.harnesses, ["claude-code", "codex", "grok-bot", "pi"]);
+  assert.equal(fs.existsSync(path.join(root, ".codex/hooks.json")), true);
+  assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), true);
+  assert.equal(fs.existsSync(path.join(root, ".pi/extensions/djournal.ts")), true);
+  assert.equal(fs.existsSync(path.join(root, "integrations/grok-bot/README.md")), true);
+
+  const partial = uninstall({ target: root, harnesses: ["grok-bot"] });
+  assert.deepEqual(partial.harnesses, ["claude-code", "codex", "pi"]);
+  assert.equal(fs.existsSync(path.join(root, "integrations/grok-bot/README.md")), false);
+  assert.equal(fs.existsSync(path.join(root, ".grokbot/README.md")), false);
+  assert.equal(fs.existsSync(path.join(root, ".codex/hooks.json")), true);
+  assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), true);
+  assert.equal(fs.existsSync(path.join(root, ".pi/extensions/djournal.ts")), true);
+  assert.equal(fs.existsSync(path.join(root, ".agents/rules/STATE.md")), true);
 });
 
 test("three-harness install is idempotent and partial/full uninstall preserves user content", async () => {
