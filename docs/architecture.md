@@ -36,7 +36,16 @@ metadata, headings, and body terms, while storing only the metadata needed to
 return explainable ranked paths. The complete Markdown body is not a stored
 result field, and every final answer still reads the selected canonical files.
 
-The snapshot is schema-, index-option-, and project-versioned. Each search compares a
+The snapshot is schema-, extractor-, index-option-, and project-versioned.
+`djournal recall files` uses exact-file and directory reverse postings in the
+same snapshot. References are extracted from explicit entry metadata and bounded
+Markdown literals during normalization, and retained even though full bodies are
+omitted from stored documents. Postings are rebuilt from retained references after
+incremental changes, and validated on cache load. Repository labels and evidence
+provenance remain attached to matches. Linked decision context is bounded and
+never constitutes an automatic compliance verdict.
+
+The cache lifecycle is shared with text recall. Each search compares a
 manifest of source paths, sizes, and modification times; changed work metadata
 reindexes its entries, and additions, edits, renames, and deletions are applied
 incrementally. Missing, incompatible, oversized, or malformed snapshots rebuild

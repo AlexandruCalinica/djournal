@@ -37,6 +37,10 @@ option, or rationale is unclear, ask for the missing information before writing.
    - `source: manual`
    - useful one- or two-sentence `summary`
    - identical `createdAt` and `updatedAt`
+   When the accepted choice explicitly governs code files or a directory, add
+   `metadata.codeReferences` following `METADATA.md`. Use `constrains` only for
+   that explicit scope, and `mentions` for contextual paths. Omit unknown repository
+   labels. This supplements rather than replaces rationale and supersession links.
 5. Add outgoing links:
    - `references` for research/docs supporting the rationale
    - `supersedes` from this decision to an explicitly replaced decision

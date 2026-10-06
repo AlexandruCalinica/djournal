@@ -254,6 +254,7 @@ Use recall directly as a search CLI:
 
 ```bash
 djournal recall search "billing webhook retries"
+djournal recall files src/billing.js --json
 djournal recall search "billing webhook retries" --type decision,research --limit 5 --json
 ```
 

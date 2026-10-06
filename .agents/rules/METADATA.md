@@ -178,3 +178,36 @@ Existing Markdown without frontmatter remains readable and MUST NOT be rejected
 by resume or recall. Treat its type, title, date, and entry number as best-effort
 values inferred from directory, filename, and first heading. Audit flags missing
 metadata; reconcile may add it conservatively without rewriting the body.
+
+## Optional code references
+
+Entries may add `metadata.codeReferences` to make code-path recall precise:
+
+```yaml
+metadata:
+  codeReferences:
+    - path: lib/recall/snapshot.js
+      kind: file
+      repository: djournal
+      relation: changes
+    - path: lib/recall/
+      kind: directory
+      repository: djournal
+      relation: constrains
+```
+
+- `path`: repository-root-relative slash path; code need not currently exist.
+- `kind`: `file` (default) or `directory`; use directory only for actual scope.
+- `repository`: optional stable exact label shared by writers and callers.
+  Do not infer it from a work item or guess it from an absolute historical path.
+  Omission means unscoped evidence, not proof of the current repository.
+- `relation`: `mentions` (default), `changes`, or `constrains`. Only use
+  `constrains` for an explicit requirement; a decision mentioning a file does
+  not automatically constrain all edits to it.
+
+These references are optional incidental metadata, not journal-entry links.
+They do not change work identity, visibility, or lifecycle. Use existing typed
+`links` for decisions and supersession. Prefer explicit references for affected
+files or governing directory scope in new entries; do not rewrite historical
+entries just to populate a cache. Recall can also extract bounded path literals
+from existing Markdown, with visibly weaker provenance.
