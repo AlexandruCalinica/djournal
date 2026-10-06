@@ -263,6 +263,7 @@ Because the journal is Markdown, different harnesses can read the same memory:
 
 - Codex can start the work.
 - Claude Code can continue from the same spine and decisions.
+- Grok Bot can continue from the same Markdown through skills and the CLI.
 - A future harness can inspect the same files and links.
 
 The journal keeps continuity outside any one model context.

@@ -18,6 +18,7 @@
     "bin/",
     "docs/",
     "install.sh",
+    "integrations/",
     "lib/",
     "spec.md"
   ],

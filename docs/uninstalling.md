@@ -25,16 +25,19 @@ so.
 djournal uninstall --harness codex
 djournal uninstall --harness claude-code
 djournal uninstall --harness pi
+djournal uninstall --harness grok-bot
 ```
 
 ## Uninstall multiple harnesses
 
 ```bash
-djournal uninstall --harness codex,claude-code,pi
+djournal uninstall --harness codex,claude-code,pi,grok-bot
 ```
 
 Partial uninstall removes only the selected harness integration and keeps the
-remaining harnesses installed.
+remaining harnesses installed. For Grok Bot that is the copied
+`integrations/grok-bot/` recipe. Shared `.agents/` files and other harness
+hooks stay in place.
 
 ## What remains durable
 
@@ -60,6 +63,7 @@ or select a harness:
 ```bash
 djournal install --harness codex
 djournal install --harness pi
+djournal install --harness grok-bot
 ```
 
 Reinstalling restores local harness integration around the existing journal
