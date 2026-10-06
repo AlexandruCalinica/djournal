@@ -41,8 +41,9 @@ djournal install
 This installs:
 
 - shared journal rules and skills under `.agents/`
-- harness-specific hook config when selected
+- harness-specific hook config when a hook harness is selected
 - a managed `.pi/extensions/djournal.ts` extension when Pi is selected
+- a skill-only Journal Hub recipe and `.grokbot/` marker when Grok Bot is selected, with no hook config
 - managed instruction blocks in `AGENTS.md` and/or `CLAUDE.md`
 - `.djournal.json`, which points to the global project store
 - for Claude Code installs, a narrow permission grant that lets the agent read
@@ -70,6 +71,14 @@ trust. In interactive Pi, use `/trust` and restart the session. For print, JSON,
 or RPC runs without a stored trust decision, pass `--approve`. djournal does not
 edit Pi's trust file. Pi itself is not a filesystem sandbox; external containers
 or sandboxes must expose the global store referenced by `.djournal.json`.
+
+Grok Bot cannot run SessionStart or Stop hooks. `djournal install --harness
+grok-bot` installs the portable skills, `AGENTS.md`, the project marker, and
+the recipe at `integrations/grok-bot/`. It does not write `.codex/hooks.json`,
+`.claude/settings.json`, or `.pi/extensions`. Register the skills in Grok from
+that recipe. `djournal doctor` reports the CLI, `.agents/`, and the marker for
+this harness and does not fail because hooks are absent. See
+[Grok Bot](grok-bot.md).
 
 To share selected work through the product repository, enable colocated
 projection:
@@ -126,12 +135,15 @@ Install for one harness:
 djournal install --harness codex
 djournal install --harness claude-code
 djournal install --harness pi
+djournal install --harness grok-bot
 ```
+
+`grok` and `grokbot` are aliases for `grok-bot`.
 
 Install for multiple harnesses:
 
 ```bash
-djournal install --harness codex,claude-code,pi
+djournal install --harness codex,claude-code,pi,grok-bot
 ```
 
 Install every supported harness:
@@ -158,7 +170,9 @@ djournal update check
 project asset version, and cached npm release availability. `doctor` checks the
 local environment and harness configuration. For Pi it reports extension
 presence and reminds you that project trust is required; it does not inspect or
-change Pi's private trust state.
+change Pi's private trust state. For Grok Bot it reports the CLI, `.agents/`
+skills and rules, the project marker, and recipe files, and points at skill
+registration. Missing Grok hooks are expected and are not a failure.
 
 ## Update notifications
 
@@ -202,6 +216,7 @@ errors.
 
 ## Related docs
 
+- [Grok Bot](grok-bot.md)
 - [Remote Git sync setup](remote-sync.md)
 - [Read-only team journal access](read-only-team-journal.md)
 - [Uninstalling and reinstalling](uninstalling.md)

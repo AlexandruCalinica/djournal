@@ -25,7 +25,7 @@ djournal config sync.mode colocated
 djournal config sync.path .
 djournal share --work 2026-07-03-01-example
 djournal sync --work 2026-07-03-01-example
-git add .agents .codex .claude AGENTS.md CLAUDE.md .djournal.json .journal
+git add .agents .codex .claude .pi .grokbot integrations/grok-bot AGENTS.md CLAUDE.md .djournal.json .journal
 git commit -m "chore: install djournal"
 git push origin main
 ```

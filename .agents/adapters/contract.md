@@ -16,6 +16,13 @@ second workflow engine and do not own durable state.
 An adapter may omit events its harness cannot support reliably. Instruction-only
 behavior remains the compatibility baseline.
 
+Grok Bot is an instruction and skill-only harness. It has no SessionStart or
+Stop hooks, so it omits every semantic event. Compliance is the installed
+skills, `AGENTS.md`, and the `djournal` / `journal` CLI. The recipe lives at
+`integrations/grok-bot/` and is described in `docs/grok-bot.md`. Adding that
+harness does not change `AUTOMATION.md`. Hooks on other harnesses still must
+not write semantic journal entries.
+
 ## Input
 
 The shared checker accepts one JSON object on stdin. It uses only stable fields:

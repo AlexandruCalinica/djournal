@@ -56,6 +56,7 @@ Install djournal for the agent harness you use:
 djournal install --harness codex
 # or: --harness claude-code
 # or: --harness pi
+# or: --harness grok-bot
 ```
 
 Then ask naturally:
