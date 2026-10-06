@@ -54,7 +54,7 @@ Options:
   --limit N             Limit recall results per kind (1-100)
   --rebuild             Rebuild the persistent recall cache from scratch
   --no-cache            Search with an ephemeral in-memory index
-  --harness LIST        Comma-separated codex,claude-code,pi selection
+  --harness LIST        Comma-separated codex,claude-code,pi,grok-bot selection
   --all                 Select all work items for share, or every harness
   --instructions-only   Install core instructions without harness hooks
 `;

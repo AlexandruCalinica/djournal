@@ -11,7 +11,7 @@ if (packageJson.license !== "Apache-2.0") throw new Error("package license must 
 if (packageJson.publishConfig?.access !== "public") throw new Error("package must publish with public access");
 
 const allowlist = new Set(packageJson.files || []);
-for (const file of [".agents/", ".claude/", ".codex/", ".pi/", "AGENTS.md", "CLAUDE.md", "LICENSE", "bin/", "lib/"]) {
+for (const file of [".agents/", ".claude/", ".codex/", ".pi/", "AGENTS.md", "CLAUDE.md", "LICENSE", "bin/", "integrations/", "lib/"]) {
   if (!allowlist.has(file)) throw new Error(`package allowlist is missing: ${file}`);
 }
 
@@ -21,6 +21,12 @@ for (const file of [
   "bin/journal.js",
   ".agents/adapters/pi/journal-hook.js",
   ".pi/extensions/djournal.ts",
+  "docs/grok-bot.md",
+  "integrations/grok-bot/README.md",
+  "integrations/grok-bot/getting-started.md",
+  "integrations/grok-bot/checkup.md",
+  "integrations/grok-bot/skill-registration.md",
+  "integrations/grok-bot/peer-briefing.md",
 ]) {
   if (!fs.existsSync(path.join(root, file))) throw new Error(`package source is missing: ${file}`);
 }

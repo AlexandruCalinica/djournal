@@ -576,9 +576,14 @@ test("detection distinguishes supported and future harness evidence", () => {
   const root = target();
   fs.mkdirSync(path.join(root, ".claude"));
   fs.mkdirSync(path.join(root, ".pi"));
-  const detected = detectHarnesses(root, { commandExists: (name) => name === "codex" });
+  const detected = detectHarnesses(root, { commandExists: (name) => name === "codex" || name === "grok" });
   assert.deepEqual(detected.supported, ["codex", "claude-code", "pi"]);
+  assert.equal(detected.evidence["grok-bot"], false);
   assert.deepEqual(detected.future, []);
+  fs.mkdirSync(path.join(root, ".grokbot"));
+  const withMarker = detectHarnesses(root, { commandExists: () => false });
+  assert.deepEqual(withMarker.supported, ["claude-code", "pi", "grok-bot"]);
+  assert.equal(withMarker.evidence["grok-bot"], true);
 });
 
 test("non-interactive ambiguous detection requires explicit selection", async () => {
@@ -588,8 +593,94 @@ test("non-interactive ambiguous detection requires explicit selection", async ()
   );
 });
 
-test("--all selects every supported harness including Pi", async () => {
-  assert.deepEqual(await selectHarnesses({ all: true }, { supported: [] }), ["codex", "claude-code", "pi"]);
+test("--all selects every supported harness including Pi and Grok Bot", async () => {
+  assert.deepEqual(await selectHarnesses({ all: true }, { supported: [] }), ["codex", "claude-code", "pi", "grok-bot"]);
+  const root = target();
+  const result = await install({ sourceRoot, target: root, all: true, interactive: false, dryRun: true });
+  assert.deepEqual(result.harnesses, ["claude-code", "codex", "grok-bot", "pi"]);
+  for (const relative of [".codex/hooks.json", ".claude/settings.json", ".pi/extensions/djournal.ts", "integrations/grok-bot/README.md"]) {
+    assert.equal(result.operations.includes(relative), true, relative);
+  }
+});
+
+test("grok and grokbot aliases normalize to grok-bot", async () => {
+  assert.deepEqual(
+    await selectHarnesses({ harnesses: ["grok", "grokbot", "grok-bot"], interactive: false }, { supported: [] }),
+    ["grok-bot"],
+  );
+  await assert.rejects(
+    selectHarnesses({ harnesses: ["grok-bots"], interactive: false }, { supported: [] }),
+    (error) => error instanceof InstallerError && error.code === "UNSUPPORTED_HARNESS",
+  );
+});
+
+test("grok-bot install copies the recipe without hooks and uninstall removes only grok assets", async () => {
+  const recipe = [
+    "integrations/grok-bot/README.md",
+    "integrations/grok-bot/getting-started.md",
+    "integrations/grok-bot/checkup.md",
+    "integrations/grok-bot/skill-registration.md",
+    "integrations/grok-bot/peer-briefing.md",
+  ];
+  const root = target();
+  const agentsOriginal = "# Existing agents\n\nKeep this.\n";
+  fs.writeFileSync(path.join(root, "AGENTS.md"), agentsOriginal);
+  fs.mkdirSync(path.join(root, ".codex"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".codex/hooks.json"), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "user-codex" }] }] }, custom: true }));
+
+  const dry = await install({ sourceRoot, target: root, harnesses: ["grok"], interactive: false, dryRun: true });
+  assert.deepEqual(dry.harnesses, ["grok-bot"]);
+  for (const relative of recipe) assert.equal(dry.operations.includes(relative), true, relative);
+  for (const relative of [".codex/hooks.json", ".claude/settings.json", ".pi/extensions/djournal.ts", "CLAUDE.md"]) {
+    assert.equal(dry.operations.includes(relative), false, relative);
+  }
+  assert.equal(dry.operations.includes(".agents/rules/STATE.md"), true);
+  assert.equal(dry.operations.includes("AGENTS.md"), true);
+  assert.equal(fs.existsSync(path.join(root, "integrations")), false);
+
+  const installed = await install({ sourceRoot, target: root, harnesses: ["grok-bot", "codex"], interactive: false });
+  assert.deepEqual(installed.harnesses, ["codex", "grok-bot"]);
+  const manifest = loadManifest(root);
+  const grokFiles = manifest.files.filter((record) => record.harness === "grok-bot").map((record) => record.path).sort();
+  assert.deepEqual(grokFiles, [...recipe].sort());
+  for (const relative of recipe) assert.equal(read(root, relative), read(sourceRoot, relative));
+  assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), false);
+  assert.equal(fs.existsSync(path.join(root, ".pi/extensions/djournal.ts")), false);
+  assert.equal(json(root, ".codex/hooks.json").custom, true);
+  assert.match(read(root, "AGENTS.md"), /Keep this/);
+
+  const health = doctor({ target: root, commandExists: () => false });
+  assert.equal(health.ok, true);
+  const grokCheck = health.checks.find((check) => check.name === "grok-bot");
+  assert.equal(grokCheck.ok, true);
+  assert.match(grokCheck.detail, /not on PATH/);
+  assert.match(grokCheck.detail, /\.agents present/);
+  assert.match(grokCheck.detail, /marker present/);
+  assert.match(grokCheck.detail, /hooks not required/);
+  assert.match(grokCheck.detail, /docs\/grok-bot\.md/);
+  assert.equal(health.checks.some((check) => check.name === ".codex/hooks.json" && check.ok === false), false);
+
+  const again = await install({ sourceRoot, target: root, harnesses: ["grokbot"], interactive: false });
+  assert.equal(again.action, "upgrade");
+  assert.deepEqual(again.harnesses, ["codex", "grok-bot"]);
+
+  fs.unlinkSync(path.join(root, PROJECT_MARKER_PATH));
+  const broken = doctor({ target: root, commandExists: () => false });
+  const brokenCheck = broken.checks.find((check) => check.name === "grok-bot");
+  assert.equal(brokenCheck.ok, false);
+  assert.match(brokenCheck.detail, /marker missing/);
+  assert.match(brokenCheck.detail, /hooks not required/);
+  assert.equal(broken.ok, false);
+
+  const partial = uninstall({ target: root, harnesses: ["grok"] });
+  assert.equal(partial.action, "partial-uninstall");
+  assert.deepEqual(partial.harnesses, ["codex"]);
+  for (const relative of recipe) assert.equal(fs.existsSync(path.join(root, relative)), false);
+  assert.equal(fs.existsSync(path.join(root, ".agents/skills/journal/SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(root, ".agents/adapters/pi/journal-hook.js")), true);
+  assert.equal(json(root, ".codex/hooks.json").custom, true);
+  assert.match(read(root, "AGENTS.md"), /Keep this/);
+  assert.equal(loadManifest(root).files.some((record) => record.harness === "grok-bot"), false);
 });
 
 test("three-harness install is idempotent and partial/full uninstall preserves user content", async () => {
@@ -747,6 +838,7 @@ test("instructions-only dry-run makes no changes", async () => {
   const result = await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false, dryRun: true });
   assert.equal(result.dryRun, true);
   assert.equal(fs.readdirSync(root).length, 0);
+  assert.equal(result.operations.some((item) => item.startsWith("integrations/grok-bot/")), false);
 });
 
 test("malformed shared JSON fails before installation writes", async () => {
