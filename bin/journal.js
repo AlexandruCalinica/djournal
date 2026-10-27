@@ -25,6 +25,9 @@ const sourceRoot = path.resolve(__dirname, "..");
 
 function usage() {
   return `Usage:
+  djournal                         Open the interactive journal
+  journal                          Alias for djournal
+  journal setup [--target DIR]
   journal install [--target DIR] [--harness LIST | --all | --instructions-only]
   journal upgrade [--target DIR]
   journal uninstall [--target DIR] [--harness LIST | --all]
@@ -64,8 +67,9 @@ Options:
 
 function parseArgs(argv) {
   const args = [...argv];
-  const command = args.shift();
-  if (!command || !["install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update", "work", "recall"].includes(command)) {
+  const command = args.length ? args.shift() : "setup";
+  if (["--help", "-h"].includes(command)) throw new InstallerError(usage(), "HELP");
+  if (!["setup", "install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update", "work", "recall"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
@@ -89,6 +93,9 @@ function parseArgs(argv) {
   }
   while (args.length) {
     const arg = args.shift();
+    if (command === "setup" && !["--target", "--help", "-h"].includes(arg) && !arg.startsWith("--target=")) {
+      throw new InstallerError("setup supports only --target and --help; use direct commands for automation", "USAGE");
+    }
     if (command === "recall" && options.subcommand === "files" && arg === "--") {
       (options.paths ||= []).push(...args.splice(0));
     } else if (arg === "--repository") {
@@ -182,95 +189,103 @@ function parseArgs(argv) {
   return options;
 }
 
-function print(value, json) {
+function print(value, json, output = process.stdout) {
   if (json) {
-    process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+    output.write(`${JSON.stringify(value, null, 2)}\n`);
     return;
   }
   if (value.action === "update-check") {
-    process.stdout.write(`cli version: ${value.cliVersion || "unknown"}\n`);
-    if (value.projectVersion) process.stdout.write(`project assets: ${value.projectVersion}\n`);
-    process.stdout.write(`latest version: ${value.latestVersion || "unknown"}\n`);
-    if (value.updateAvailable) process.stdout.write(`update available: ${value.cliVersion} -> ${value.latestVersion}\n`);
-    else if (value.latestVersion) process.stdout.write("djournal CLI is up to date\n");
-    if (value.projectUpdateAvailable) process.stdout.write(`project upgrade available: ${value.projectVersion} -> ${value.cliVersion}\n`);
-    if (value.checkedAt) process.stdout.write(`checked: ${value.checkedAt}\n`);
+    output.write(`cli version: ${value.cliVersion || "unknown"}\n`);
+    if (value.projectVersion) output.write(`project assets: ${value.projectVersion}\n`);
+    output.write(`latest version: ${value.latestVersion || "unknown"}\n`);
+    if (value.updateAvailable) output.write(`update available: ${value.cliVersion} -> ${value.latestVersion}\n`);
+    else if (value.latestVersion) output.write("djournal CLI is up to date\n");
+    if (value.projectUpdateAvailable) output.write(`project upgrade available: ${value.projectVersion} -> ${value.cliVersion}\n`);
+    if (value.checkedAt) output.write(`checked: ${value.checkedAt}\n`);
     return;
   }
   if (value.action === "work-list") {
-    if (value.selected) process.stdout.write(`selected: ${value.selected}\n`);
+    if (value.selected) output.write(`selected: ${value.selected}\n`);
     for (const item of value.workItems || []) {
       const marker = item.selected ? "*" : " ";
-      process.stdout.write(`${marker} ${item.slug} [${item.status}] ${item.title}\n`);
+      output.write(`${marker} ${item.slug} [${item.status}] ${item.title}\n`);
     }
     return;
   }
   if (value.action === "work-bind") {
-    process.stdout.write(`bound ${value.work} to session ${value.sessionHash}\n`);
+    output.write(`bound ${value.work} to session ${value.sessionHash}\n`);
     return;
   }
   if (value.action === "recall-files") {
-    process.stdout.write(`recall files: ${value.cache.status} (${value.cache.mode}), ${value.entries.length}/${value.totalEntries} entries\n`);
+    output.write(`recall files: ${value.cache.status} (${value.cache.mode}), ${value.entries.length}/${value.totalEntries} entries\n`);
     for (const entry of value.entries) {
-      process.stdout.write(`${entry.path}  ${entry.title}\n`);
+      output.write(`${entry.path}  ${entry.title}\n`);
       for (const match of entry.matches) {
         const detail = match.kind === "linked_context" ? `via ${match.viaPath}` : `${match.recordedPath} (${match.scope}, ${match.evidence.provenance})`;
-        process.stdout.write(`  ${match.inputPath}: ${match.kind} — ${detail}\n`);
+        output.write(`  ${match.inputPath}: ${match.kind} — ${detail}\n`);
       }
-      for (const replacement of entry.supersededBy) process.stdout.write(`  superseded by: ${replacement.path}\n`);
-      if (entry.matchesTruncated || entry.codeReferencesTruncated || entry.supersededByTruncated) process.stdout.write("  additional entry evidence truncated\n");
+      for (const replacement of entry.supersededBy) output.write(`  superseded by: ${replacement.path}\n`);
+      if (entry.matchesTruncated || entry.codeReferencesTruncated || entry.supersededByTruncated) output.write("  additional entry evidence truncated\n");
     }
-    if (value.unmatchedPaths.length) process.stdout.write(`no indexed evidence: ${value.unmatchedPaths.join(", ")}\n`);
-    if (value.truncated || value.relatedTruncated) process.stdout.write("results or linked context truncated; narrow paths or raise --limit\n");
-    for (const item of value.warnings) process.stdout.write(`warning: ${item.code}\n`);
-    process.stdout.write("Evidence candidates only; read canonical entries before assessing the change.\n");
+    if (value.unmatchedPaths.length) output.write(`no indexed evidence: ${value.unmatchedPaths.join(", ")}\n`);
+    if (value.truncated || value.relatedTruncated) output.write("results or linked context truncated; narrow paths or raise --limit\n");
+    for (const item of value.warnings) output.write(`warning: ${item.code}\n`);
+    output.write("Evidence candidates only; read canonical entries before assessing the change.\n");
     return;
   }
   if (value.action === "recall-index") {
-    process.stdout.write(`recall index: ${value.cache.status} (${value.cache.mode})\n`);
-    process.stdout.write(`documents: ${value.cache.documentCount}\n`);
-    process.stdout.write(`elapsed: ${value.cache.totalMs.toFixed(1)} ms\n`);
-    for (const item of value.warnings || []) process.stdout.write(`warning: ${item.code}${item.path ? ` ${item.path}` : ""}${item.detail ? ` - ${item.detail}` : ""}\n`);
+    output.write(`recall index: ${value.cache.status} (${value.cache.mode})\n`);
+    output.write(`documents: ${value.cache.documentCount}\n`);
+    output.write(`elapsed: ${value.cache.totalMs.toFixed(1)} ms\n`);
+    for (const item of value.warnings || []) output.write(`warning: ${item.code}${item.path ? ` ${item.path}` : ""}${item.detail ? ` - ${item.detail}` : ""}\n`);
     return;
   }
   if (value.action === "recall-search") {
-    process.stdout.write(`recall search: ${value.cache.status} (${value.cache.mode}), ${value.cache.totalMs.toFixed(1)} ms\n`);
+    output.write(`recall search: ${value.cache.status} (${value.cache.mode}), ${value.cache.totalMs.toFixed(1)} ms\n`);
     for (const item of [...(value.workItems || []), ...(value.entries || [])]) {
-      process.stdout.write(`${item.score.toFixed(2).padStart(8)}  ${item.path}  ${item.title}\n`);
+      output.write(`${item.score.toFixed(2).padStart(8)}  ${item.path}  ${item.title}\n`);
     }
-    for (const item of value.warnings || []) process.stdout.write(`warning: ${item.code}${item.path ? ` ${item.path}` : ""}${item.detail ? ` - ${item.detail}` : ""}\n`);
+    for (const item of value.warnings || []) output.write(`warning: ${item.code}${item.path ? ` ${item.path}` : ""}${item.detail ? ` - ${item.detail}` : ""}\n`);
     return;
   }
-  if (value.action) process.stdout.write(`${value.action}: ${value.target}\n`);
-  else if (typeof value.installed === "boolean") process.stdout.write(value.installed ? `installed: ${value.target}\n` : `not installed: ${value.target}\n`);
-  else process.stdout.write(`${value.ok ? "ok" : "failed"}: ${value.target}\n`);
-  if (value.harnesses) process.stdout.write(`harnesses: ${value.harnesses.join(", ") || "instructions-only"}\n`);
-  if (value.key) process.stdout.write(`${value.key}: ${JSON.stringify(value.value)}\n`);
-  else if (value.config) process.stdout.write(`${JSON.stringify(value.config, null, 2)}\n`);
-  if (value.cliVersion) process.stdout.write(`cli version: ${value.cliVersion}\n`);
-  if (value.projectVersion) process.stdout.write(`project assets: ${value.projectVersion}\n`);
-  if (value.latestVersion) process.stdout.write(`latest version: ${value.latestVersion}\n`);
-  if (value.updateAvailable) process.stdout.write("update available: yes\n");
-  if (value.projectUpdateAvailable) process.stdout.write("project upgrade available: yes\n");
+  if (value.action) output.write(`${value.action}: ${value.target}\n`);
+  else if (typeof value.installed === "boolean") output.write(value.installed ? `installed: ${value.target}\n` : `not installed: ${value.target}\n`);
+  else output.write(`${value.ok ? "ok" : "failed"}: ${value.target}\n`);
+  if (value.harnesses) output.write(`harnesses: ${value.harnesses.join(", ") || "instructions-only"}\n`);
+  if (value.key) output.write(`${value.key}: ${JSON.stringify(value.value)}\n`);
+  else if (value.config) output.write(`${JSON.stringify(value.config, null, 2)}\n`);
+  if (value.cliVersion) output.write(`cli version: ${value.cliVersion}\n`);
+  if (value.projectVersion) output.write(`project assets: ${value.projectVersion}\n`);
+  if (value.latestVersion) output.write(`latest version: ${value.latestVersion}\n`);
+  if (value.updateAvailable) output.write("update available: yes\n");
+  if (value.projectUpdateAvailable) output.write("project upgrade available: yes\n");
   if (value.recallCache) {
     const cache = value.recallCache;
-    process.stdout.write(`recall cache: ${cache.valid ? `${cache.documentCount} documents, ${cache.indexVersion}` : (cache.exists ? "invalid; rebuilds on next recall" : "not built")}\n`);
+    output.write(`recall cache: ${cache.valid ? `${cache.documentCount} documents, ${cache.indexVersion}` : (cache.exists ? "invalid; rebuilds on next recall" : "not built")}\n`);
   }
   if (value.workItems) {
     for (const item of value.workItems) {
-      process.stdout.write(`${item.changed ? "shared" : "unchanged"} ${item.work}\n`);
-      if (item.warning) process.stdout.write(`warning: ${item.warning}\n`);
+      if (typeof item === "string") {
+        output.write(`${item}\n`);
+        continue;
+      }
+      output.write(`${item.changed ? "shared" : "unchanged"} ${item.work}\n`);
+      if (item.warning) output.write(`warning: ${item.warning}\n`);
     }
   }
-  if (value.conflicts?.length) process.stdout.write(`conflicts: ${value.conflicts.join(", ")}\n`);
+  if (value.work) output.write(`work: ${value.work}\n`);
+  if (value.shared) output.write("marked for sharing\n");
+  if (value.skipped) output.write(`skipped: ${value.reason || "no changes required"}\n`);
+  if (value.warning) output.write(`warning: ${value.warning}\n`);
+  if (value.conflicts?.length) output.write(`conflicts: ${value.conflicts.join(", ")}\n`);
   if (value.files) {
     for (const file of value.files) {
-      if (typeof file === "string") process.stdout.write(`${file}\n`);
-      else process.stdout.write(`${file.status.padEnd(8)} ${file.path}\n`);
+      if (typeof file === "string") output.write(`${file}\n`);
+      else output.write(`${file.status.padEnd(8)} ${file.path}\n`);
     }
   }
   if (value.checks) {
-    for (const check of value.checks) process.stdout.write(`${check.ok ? "ok" : "fail"} ${check.name}: ${check.detail}\n`);
+    for (const check of value.checks) output.write(`${check.ok ? "ok" : "fail"} ${check.name}: ${check.detail}\n`);
   }
 }
 
@@ -307,6 +322,13 @@ function launchUpdateRefresh(options, runner = spawn) {
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
+    if (options.command === "setup") {
+      const { setup } = require("../lib/setup.js");
+      const result = await setup(options, { print });
+      if (result.cancelled) process.exitCode = 130;
+      else if (result.failed) process.exitCode = 2;
+      return;
+    }
     let result;
     if (options.command === "install") result = await install(options);
     else if (options.command === "upgrade") result = await upgrade(options);
