@@ -163,8 +163,17 @@ Requires Node.js 18 or newer. Run this from the project you want to equip:
 
 ```bash
 npm install -g djournal
-djournal install
+djournal
 ```
+
+Run `djournal` or `journal` without arguments to open the interactive journal.
+Browse work, search with Recall, open entries in your editor, manage sharing,
+and inspect project status. Installation, configuration, upgrades, diagnostics,
+and uninstall are available from the same menu. `djournal setup` remains an
+explicit way to open it, including `--target /path/to/project`.
+
+Existing commands remain available for direct use and automation. The wizard
+requires an interactive terminal; use `djournal --help` to see the commands.
 
 The global install gives you the `djournal` and `journal` commands. The
 installer targets the current directory and detects Codex, Claude Code, Pi, or
