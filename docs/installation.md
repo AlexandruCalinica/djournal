@@ -11,15 +11,124 @@ carry journal memory. The installed project gets harness integration plus a
 npm install -g djournal
 ```
 
-Then run the installer from the repository or journal workspace you want to
-equip:
+Then open the interactive journal from your repository or journal workspace:
 
 ```bash
-djournal install
+djournal
 ```
 
 The package exposes both `djournal` and `journal` commands. They point to the
 same CLI.
+
+## Interactive journal
+
+Run `djournal` or `journal` without arguments in an interactive terminal.
+`djournal setup` remains supported; use `djournal setup --target /path/to/project`
+to open another project. Use the arrow keys and Enter to choose an option.
+
+Each new question or menu replaces the previous screen. The project header stays
+visible, and new results, errors, and confirmation details appear above the next
+prompt until you continue. Returning from an editor redraws the entry picker.
+A mark of two offset journal pages and a bookmark heads the wizard, beside the
+djournal wordmark. Search, filters, and smaller terminals use a small document
+symbol and the wordmark.
+`TERM=dumb` uses an ASCII version of the mark.
+Menus show short labels and details for the highlighted item; long paths wrap
+instead of widening the menu. The list height adapts to the terminal size.
+Color is optional: `NO_COLOR=1 djournal` uses plain text, and selection and
+checkbox markers remain visible without color.
+
+- **List:** choose a work item, then open an entry in your editor, share, pull, sync, or bind an active item to
+  an agent session. Sharing marks the item; Sync copies it to the Git projection.
+  If synchronization is disabled, the wizard offers configuration first.
+- **Recall:** search journal knowledge across work items and open matching
+  entries or work descriptions in your editor. Press Tab to adjust filters, or refresh/rebuild the search index from the Recall menu.
+- **Status:** inspect the project's installation, integrations, and versions.
+- **Install:** select Codex, Claude Code, Pi, Grok Bot, a custom combination, all
+  supported integrations, or instructions only. After installation, configure the project.
+  Existing integrations are retained on an already installed project.
+- **Configure:** keep work local, share through the project repository, or use
+  a separate existing journal Git repository. Set automatic sync for standalone
+  mode and choose update notifications and their frequency. Current values are
+  defaults; review the proposed changes before saving.
+- **Upgrade:** refresh installed project assets with the installed CLI version.
+- **Update:** run the existing `update check` operation. If a newer CLI is
+  available, show the npm update command; the wizard does not install packages.
+- **Doctor:** run the existing project health checks.
+- **Uninstall:** remove one integration or all installed assets after confirmation.
+  Journal history is kept; modified installed files are preserved and reported.
+
+Press **Escape** to go back to the parent menu from any prompt. From a work's
+actions it returns to the work picker; from the entry picker it returns to that
+work's actions. In an unfinished install, configuration, or work action, Escape
+discards the pending answers and returns to the menu that launched it. At the
+main menu, Escape stays there. Completed operations remain applied.
+
+Menus also have Back and Exit choices. Use Space to toggle integrations in the
+checkbox list; detected integrations start selected. Enter accepts the current
+selection or displayed default. Ctrl-C, Ctrl-D, or end-of-input cancels. Completed operations remain applied, while
+configuration answers are saved only after confirmation. A failed operation
+returns to the main menu with an error; the process exits with code 2 if an
+operation failed, or 130 on cancellation.
+
+The wizard requires terminal input and output. An argument-free invocation in a
+pipe or script returns an interactive-terminal error instead of waiting for input.
+The explicit `setup` command accepts only `--target` and `--help`.
+All existing commands continue to work directly, including JSON and dry runs.
+Use `djournal --help` for the command list.
+For example, `djournal install --all` installs directly without the wizard.
+
+### Recall from the wizard
+
+Choose **Recall → Search journal** and start typing. Results update in place
+after a 250 ms pause; you do not need to submit the query. Use Up/Down to select
+a result and Enter to open its canonical Markdown file in your editor. Close
+the editor to return to the same query and refreshed results. Both entries and
+work descriptions are searched, including completed work; the current session binding does not silently restrict the search.
+
+Keep typing to change the query. Press **Tab** at any time to open the filter
+panel, including while results load. All filters appear together: work item,
+result kind, entry type, work status, visibility, and maximum results per kind.
+Use **Up/Down** to choose a field and **Left/Right** to adjust it. On the result
+limit row, you can also type a number from 1 to 100. **Enter** applies the draft
+and returns to the same query; **Escape** discards it. **Ctrl-R** resets the draft
+to defaults, which you can apply or discard.
+
+The search screen shows the current scope and a compact, paged list of matches.
+Filter controls are separate from matches. Previous matches remain dimmed while
+updating and cannot be opened until the new search finishes. Blank queries skip
+searching; Tab still opens filters and Escape returns to Recall.
+
+**Refresh index** updates the cache from the journal. **Rebuild index** recreates
+it after confirmation. These use the same services as `djournal recall index`
+and `djournal recall index --rebuild`; they do not rewrite journal entries.
+
+### Open journal entries in your editor
+
+Choose **List → a work item → Open entry in editor**. The picker lists journal,
+research, documentation, and decision entries, newest first, with their dates,
+types, titles, and filenames. It reads the canonical journal store configured by
+`.djournal.json`, with support for legacy local journals. Sharing does not need
+to be enabled.
+
+The editor is selected from `$VISUAL`, then `$EDITOR`, falling back to `vi`
+(`notepad` on Windows). For example:
+
+```bash
+export EDITOR='nano'
+export VISUAL='vim -R'
+djournal
+```
+
+Quoted executable paths and arguments are supported, such as
+`VISUAL='"/path with spaces/editor" --wait'`. Commands run directly; shell aliases,
+pipes, variable expansion, and other shell expressions are not evaluated. Use a
+waiting mode such as `code --wait` for an editor that otherwise returns immediately.
+
+Close the editor to return to the entry picker. The canonical Markdown file is
+opened directly, so saving edits changes the journal; use your editor's read-only
+flag if desired. The wizard does not rewrite entry metadata. If an editor cannot
+start or exits unsuccessfully, the picker remains available for retry or Escape.
 
 ## No global install
 
