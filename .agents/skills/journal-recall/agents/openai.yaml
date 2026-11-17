@@ -1,0 +1,4 @@
+interface:
+  display_name: "Journal Recall"
+  short_description: "Find prior project decisions and journal evidence"
+  default_prompt: "Use $journal-recall to find the prior project decisions relevant to this task."

@@ -275,7 +275,7 @@ djournal recall search "billing webhook retries" --type decision,research --limi
 ```
 
 Or install a harness and ask its agent naturally: “Recall why we chose the
-current billing webhook retry strategy.” The bundled `recall` skill calls the
+current billing webhook retry strategy.” The bundled `journal-recall` skill calls the
 same CLI, selects the best journal paths, reads the canonical Markdown, follows
 relevant links, and returns an evidence-backed answer.
 
@@ -284,6 +284,10 @@ items and entry paths before reading canonical Markdown. Warm queries reuse the
 snapshot; additions, edits, deletes, and work-metadata changes refresh it on the
 next search. Use `--no-cache` for a one-call in-memory index. Cache corruption or
 write denial is recoverable and never triggers a share, sync, commit, or push.
+All bundled skills use the `journal-*` namespace, including `journal-resume`,
+`journal-plan`, and `journal-entry`. See [skill names and invocation](docs/installation.md#journal-skill-names-and-invocation)
+for the rename mapping and upgrade behavior.
+
 See [Fast recall](docs/recall.md) for standalone CLI examples, agent behavior,
 filters, and cache lifecycle details.
 

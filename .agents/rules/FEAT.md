@@ -43,7 +43,7 @@ Example: `2026-06-29-01-portable-journal-skill-improvements`.
 
 ## Initialization
 
-`init-work` MUST:
+`journal-init-work` MUST:
 
 1. Inspect existing work folders to select a non-conflicting daily sequence.
 2. Create the complete directory structure above.

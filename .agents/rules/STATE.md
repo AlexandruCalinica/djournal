@@ -43,9 +43,9 @@ Session binding does not change this file and is not durable journal history.
 
 ## Missing or invalid state
 
-- `init-work` may create `<journal-root>/state.json` after creating the work
+- `journal-init-work` may create `<journal-root>/state.json` after creating the work
   folder and `work.md`.
-- `switch` may repair state only after the user selects an existing work item.
-- Other write skills MUST stop with: `No active work found. Run init-work or switch first.`
+- `journal-switch` may repair state only after the user selects an existing work item.
+- Other write skills MUST stop with: `No active work found. Run journal-init-work or journal-switch first.`
 - Read-only recall across all work items may proceed without active state.
 - Never guess the active work item from recency when a write would result.

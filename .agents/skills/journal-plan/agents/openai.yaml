@@ -1,0 +1,4 @@
+interface:
+  display_name: "Journal Plan"
+  short_description: "Write a durable djournal implementation plan"
+  default_prompt: "Use $journal-plan to design this change and save the implementation plan in the journal."

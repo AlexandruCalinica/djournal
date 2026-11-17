@@ -42,18 +42,20 @@ project/
 │   │   ├── SAFETY.md
 │   │   └── STATE.md
 │   └── skills/
-│       ├── audit/
-│       ├── decision/
-│       ├── document/
-│       ├── init-work/
-│       ├── journal/
-│       ├── plan/
-│       ├── recall/
-│       ├── reconcile/
-│       ├── research-codebase/
-│       ├── research-web/
-│       ├── resume/
-│       └── switch/
+│       ├── journal-audit/
+│       ├── journal-decision/
+│       ├── journal-document/
+│       ├── journal-init-work/
+│       ├── journal-entry/
+│       ├── journal-workflow/
+│       ├── journal-reinforce/
+│       ├── journal-plan/
+│       ├── journal-recall/
+│       ├── journal-reconcile/
+│       ├── journal-research-codebase/
+│       ├── journal-research-web/
+│       ├── journal-resume/
+│       └── journal-switch/
 └── .journal/
     ├── state.json
     └── work/
@@ -209,15 +211,15 @@ original wall-clock creation time.
 Typical flow:
 
 ```text
-init-work or switch
-  → resume
-  → research-codebase / research-web
-  → plan
+journal-init-work or journal-switch
+  → journal-resume
+  → journal-research-codebase / journal-research-web
+  → journal-plan
   → implementation
-  → decision / document when needed
-  → journal
-  → audit or reconcile periodically
-  → recall for historical questions
+  → journal-decision / journal-document when needed
+  → journal-entry
+  → journal-audit or journal-reconcile periodically
+  → journal-recall for historical questions
 ```
 
 Producer skills emit exact metadata and follow the shared safety/link contracts.
@@ -225,12 +227,12 @@ Retrieval skills index frontmatter first, then deep-read only selected bodies.
 
 ## 12. Resume and recall
 
-`resume` loads work metadata, latest spine state/timeline/next steps, five recent
+`journal-resume` loads work metadata, latest spine state/timeline/next steps, five recent
 spine entries as fallback, and at most three relevant linked supporting entries.
 It reports possible unjournaled Git changes and unmatched plans without claiming
 formal session recovery.
 
-`recall` ranks work items from `work.md`, filters entries by metadata, and follows
+`journal-recall` ranks work items from `work.md`, filters entries by metadata, and follows
 typed links lazily. Deep reads are bounded to eight spine and three supporting
 entries; technical verification is bounded to five code files.
 
@@ -239,7 +241,7 @@ filename, and heading.
 
 ## 13. Audit and reconciliation
 
-`audit` is strictly read-only and walks every entry in scope. It checks the
+`journal-audit` is strictly read-only and walks every entry in scope. It checks the
 filesystem contract plus the reconciliation checklist:
 
 1. misclassified type
@@ -250,7 +252,7 @@ filesystem contract plus the reconciliation checklist:
 6. wrong work status
 7. forked/duplicate entry numbers, flag only
 
-`reconcile` runs audit first, reports proposed changes, then applies only clear
+`journal-reconcile` runs audit first, reports proposed changes, then applies only clear
 fixes. It may enrich legacy metadata, repair deterministic links, improve factual
 summaries, extract explicit decisions, and correct unequivocal status.
 

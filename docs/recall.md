@@ -2,7 +2,12 @@
 
 Recall finds the journal files most likely to answer a question before anyone
 spends time opening and summarizing them. It can be used directly as a small
-search CLI, or indirectly through an agent that has djournal's `recall` skill.
+search CLI, or indirectly through an agent that has djournal's `journal-recall` skill.
+
+For an explicit skill invocation, use `/journal-recall` in Claude or
+`$journal-recall` in Codex. Ask `journal-resume` for the selected work item's
+current state and next steps. Native agent memory may help locate information,
+but journal answers cite the canonical Markdown sources.
 Both paths use the same local index and keep Markdown as the source of truth.
 
 ## Use it as a standalone CLI
@@ -65,7 +70,7 @@ Then ask naturally:
 Recall why we chose the current billing webhook retry strategy.
 ```
 
-The `recall` skill classifies the question, calls the same CLI with `--json`,
+The `journal-recall` skill classifies the question, calls the same CLI with `--json`,
 uses the ranked paths to select a small evidence set, and reads those canonical
 Markdown files before answering. It follows relevant entry links and starts
 from the latest spine entry when the question needs chronology or current

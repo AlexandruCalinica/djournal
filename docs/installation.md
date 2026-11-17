@@ -283,6 +283,54 @@ Claude integration removes its unchanged installed skills while retaining
 `.agents/skills/`. Existing or locally modified skill files are preserved;
 different content at an installation destination produces an `ASSET_CONFLICT`.
 
+### Journal skill names and invocation
+
+All bundled skills use `journal-*` names. Their folder and frontmatter names
+match across `.agents/skills/`, Claude's project copies, and Grok registration.
+
+| Previous skill | Current skill |
+| --- | --- |
+| `resume` | `journal-resume` |
+| `recall` | `journal-recall` |
+| `plan` | `journal-plan` |
+| `journal` | `journal-entry` |
+| `init-work` | `journal-init-work` |
+| `switch` | `journal-switch` |
+| `decision` | `journal-decision` |
+| `document` | `journal-document` |
+| `research-codebase` | `journal-research-codebase` |
+| `research-web` | `journal-research-web` |
+| `reinforce` | `journal-reinforce` |
+| `audit` | `journal-audit` |
+| `reconcile` | `journal-reconcile` |
+| `journal-workflow` | `journal-workflow` (unchanged) |
+
+In Claude, invoke `/journal-resume`, `/journal-recall`, or `/journal-plan`
+directly. In Codex, use `$journal-resume`, `$journal-recall`, or `$journal-plan`.
+Natural requests such as “where did we leave off?” or “why did we choose this?”
+should route through the corresponding skill when project memory is needed.
+If a skill is missing from the catalog, the workflow reads its canonical
+`.agents/skills/<skill-name>/SKILL.md` file. If that file is also missing,
+upgrade or repair the installation; do not assume the journal was consulted.
+
+Run `djournal upgrade` after updating the CLI to migrate managed copies.
+Unchanged installer-created old skill files are removed. Modified managed
+files produce a conflict and remain intact; pre-existing unowned copies are
+preserved. No generic aliases are installed. Manually installed personal skills
+are outside this migration: review those separately if old names remain visible.
+Restart the agent after upgrading, and re-register Grok workflows as needed.
+CLI commands such as `djournal recall` and entry types such as `plan` keep
+their names.
+
+Claude's native `/resume` and `/plan` commands and auto memory serve different
+purposes from journal context retrieval and durable planning. The namespace and
+explicit routing help distinguish them; native tools remain available. Automatic
+selection still depends on the model, available skills, permissions, and context
+budget. These instructions do not guarantee a skill call. If selection is skipped,
+invoke the journal skill directly and confirm it cites or writes the expected
+canonical journal entry. See [Claude's skill selection and troubleshooting](https://code.claude.com/docs/en/skills)
+and [native commands](https://code.claude.com/docs/en/commands).
+
 ### Missing instruction blocks
 
 Reinstall and upgrade restore a completely missing djournal block in `AGENTS.md`
