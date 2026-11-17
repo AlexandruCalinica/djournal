@@ -16,6 +16,11 @@ second workflow engine and do not own durable state.
 An adapter may omit events its harness cannot support reliably. Instruction-only
 behavior remains the compatibility baseline.
 
+Start/prompt reminders name the `journal-*` skills and point to the invocation
+contract in `AUTOMATION.md`. They do not infer which skill a request needs,
+track skill calls, or block native memory or planning tools. Closure validation
+does not prove that resume, recall, or planning happened earlier.
+
 Grok Bot is an instruction and skill-only harness. It has no SessionStart or
 Stop hooks, so it omits every semantic event. Compliance is the installed
 skills, `AGENTS.md`, and the `djournal` / `journal` CLI. The recipe lives at

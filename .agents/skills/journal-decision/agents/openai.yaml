@@ -1,0 +1,4 @@
+interface:
+  display_name: "Journal Decision"
+  short_description: "Record and link a durable technical decision"
+  default_prompt: "Use $journal-decision to record this decision and link its supporting context."

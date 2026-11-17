@@ -15,8 +15,8 @@ read-only setup is achieved by combining three controls:
   push to it.
 - djournal sync config that enables `pull` but does not enable automatic
   publication.
-- Agent prompts that ask for read-only skills such as `recall`, `research`, and
-  `document`, not implementation or journal closure.
+- Agent prompts that ask for read-only skills such as `journal-recall` and
+  `journal-resume`, not implementation or journal closure.
 
 This still writes local files under the user's djournal home. "Read-only" means
 read-only with respect to the organization remote, not a filesystem mode that

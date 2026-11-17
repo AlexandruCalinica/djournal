@@ -146,7 +146,7 @@ response that closes `.journal/work/<slug>/journal/...` synchronizes that
 `<slug>` even if `state.json` currently selects a different active work item.
 
 Configured standalone automatic sync also pulls when a new chat/session starts.
-The `init-work` and `switch` workflows pull before enumerating work, and an
+The `journal-init-work` and `journal-switch` workflows pull before enumerating work, and an
 explicit request such as “sync the journal” triggers a pull before the agent
 handles publication. Automatic hook failures are reported as bounded context;
 explicit pull/sync conflicts exit nonzero for manual resolution.

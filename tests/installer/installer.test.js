@@ -63,6 +63,21 @@ function count(text, value) {
   return text.split(value).length - 1;
 }
 
+function legacySkillSource() {
+  const legacy = target();
+  for (const relative of [...sourceInventory(sourceRoot), "AGENTS.md", "package.json", ".claude/settings.json"]) {
+    let content = read(sourceRoot, relative);
+    const destination = relative.replace(/^\.agents\/skills\/(journal-[^/]+)\//, (_match, name) => {
+      const old = name === "journal-workflow" ? name : name === "journal-entry" ? "journal" : name.slice("journal-".length);
+      content = content.replace(`name: ${name}\n`, `name: ${old}\n`).replaceAll(`$${name}`, `$${old}`);
+      return `.agents/skills/${old}/`;
+    });
+    fs.mkdirSync(path.dirname(path.join(legacy, destination)), { recursive: true });
+    fs.writeFileSync(path.join(legacy, destination), content);
+  }
+  return legacy;
+}
+
 test("managed Markdown blocks update and remove without replacing surrounding text", () => {
   const original = "# Existing\n\nKeep this.\n";
   const installed = upsertManagedBlock(original, "Journal v1");
@@ -621,7 +636,7 @@ test("grok-bot install copies the recipe without hook fragments and uninstalls o
   });
   for (const relative of [
     ".agents/rules/AUTOMATION.md",
-    ".agents/skills/journal/SKILL.md",
+    ".agents/skills/journal-entry/SKILL.md",
     ".agents/adapters/contract.md",
     "AGENTS.md",
     ".grokbot/README.md",
@@ -672,7 +687,7 @@ test("grok-bot install copies the recipe without hook fragments and uninstalls o
   assert.equal(fs.existsSync(path.join(root, "integrations/grok-bot/README.md")), false);
   assert.equal(read(root, ".grokbot/local.txt"), "keep me\n");
   assert.equal(fs.existsSync(path.join(root, ".agents/rules/AUTOMATION.md")), true);
-  assert.equal(fs.existsSync(path.join(root, ".agents/skills/journal/SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(root, ".agents/skills/journal-entry/SKILL.md")), true);
 });
 
 test("--all includes grok-bot assets and other harness hooks", async () => {
@@ -901,7 +916,7 @@ test("Claude project skills install, upgrade and uninstall independently of acco
     assert.deepEqual(fs.readdirSync(alternateConfig), []);
     uninstall({ target: root, harnesses: ["claude-code"] });
     assert.equal(fs.existsSync(path.join(root, ".claude/skills")), false);
-    assert.ok(fs.existsSync(path.join(root, ".agents/skills/journal/SKILL.md")));
+    assert.ok(fs.existsSync(path.join(root, ".agents/skills/journal-entry/SKILL.md")));
   } finally {
     if (previousConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR;
     else process.env.CLAUDE_CONFIG_DIR = previousConfig;
@@ -910,7 +925,7 @@ test("Claude project skills install, upgrade and uninstall independently of acco
 
 test("Claude skills preserve existing and modified files", async () => {
   const root = target();
-  const skill = ".claude/skills/journal/SKILL.md";
+  const skill = ".claude/skills/journal-entry/SKILL.md";
   fs.mkdirSync(path.dirname(path.join(root, skill)), { recursive: true });
   fs.writeFileSync(path.join(root, skill), "User's journal skill\n");
   await assert.rejects(
@@ -919,11 +934,11 @@ test("Claude skills preserve existing and modified files", async () => {
   );
   assert.equal(read(root, skill), "User's journal skill\n");
   assert.equal(fs.existsSync(path.join(root, "AGENTS.md")), false);
-  fs.writeFileSync(path.join(root, skill), read(sourceRoot, ".agents/skills/journal/SKILL.md"));
+  fs.writeFileSync(path.join(root, skill), read(sourceRoot, ".agents/skills/journal-entry/SKILL.md"));
   await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
   assert.equal(loadManifest(root).files.find((file) => file.path === skill).created, false);
   uninstall({ target: root, harnesses: ["claude-code"] });
-  assert.equal(read(root, skill), read(sourceRoot, ".agents/skills/journal/SKILL.md"));
+  assert.equal(read(root, skill), read(sourceRoot, ".agents/skills/journal-entry/SKILL.md"));
 
   await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
   fs.writeFileSync(path.join(root, skill), "Edited after install\n");
@@ -940,7 +955,7 @@ test("upgrade adds Claude skills to older installs and updates supporting resour
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.copyFileSync(path.join(sourceRoot, relative), destination);
   }
-  const resource = ".agents/skills/journal/references/example.md";
+  const resource = ".agents/skills/journal-entry/references/example.md";
   fs.mkdirSync(path.dirname(path.join(incoming, resource)), { recursive: true });
   fs.writeFileSync(path.join(incoming, resource), "Example v1\n");
   await install({ sourceRoot: incoming, target: root, harnesses: ["claude-code"], interactive: false });
@@ -952,14 +967,69 @@ test("upgrade adds Claude skills to older installs and updates supporting resour
   manifest.files = manifest.files.filter((file) => !file.path.startsWith(".claude/skills/"));
   fs.writeFileSync(path.join(root, MANIFEST_PATH), JSON.stringify(manifest));
   await upgrade({ sourceRoot: incoming, target: root });
-  assert.equal(read(root, ".claude/skills/journal/references/example.md"), "Example v1\n");
+  assert.equal(read(root, ".claude/skills/journal-entry/references/example.md"), "Example v1\n");
   fs.writeFileSync(path.join(incoming, resource), "Example v2\n");
   await upgrade({ sourceRoot: incoming, target: root });
-  assert.equal(read(root, ".claude/skills/journal/references/example.md"), "Example v2\n");
+  assert.equal(read(root, ".claude/skills/journal-entry/references/example.md"), "Example v2\n");
   assert.equal(status({ target: root }).clean, true);
   uninstall({ target: root, harnesses: ["claude-code"] });
   assert.equal(fs.existsSync(path.join(root, ".claude/skills")), false);
   assert.equal(read(root, resource), "Example v2\n");
+});
+
+test("upgrade migrates generic portable and Claude skills to the journal namespace", async () => {
+  const root = target();
+  await install({ sourceRoot: legacySkillSource(), target: root, harnesses: ["claude-code"], interactive: false });
+  const oldManifest = read(root, MANIFEST_PATH);
+  assert.ok(fs.existsSync(path.join(root, ".claude/skills/resume/SKILL.md")));
+  await upgrade({ sourceRoot, target: root, dryRun: true });
+  assert.equal(read(root, MANIFEST_PATH), oldManifest);
+  assert.equal(fs.existsSync(path.join(root, ".claude/skills/journal-resume/SKILL.md")), false);
+  await upgrade({ sourceRoot, target: root });
+  for (const prefix of [".agents/skills", ".claude/skills"]) {
+    assert.deepEqual(fs.readdirSync(path.join(root, prefix)).sort(), fs.readdirSync(path.join(sourceRoot, ".agents/skills")).sort());
+    assert.equal(read(root, `${prefix}/journal-resume/SKILL.md`), read(sourceRoot, ".agents/skills/journal-resume/SKILL.md"));
+    assert.ok(fs.existsSync(path.join(root, `${prefix}/journal-entry/SKILL.md`)));
+  }
+  assert.equal(status({ target: root }).clean, true);
+  await upgrade({ sourceRoot, target: root });
+  assert.equal(status({ target: root }).clean, true);
+  uninstall({ target: root });
+  assert.equal(fs.existsSync(path.join(root, ".agents/skills")), false);
+  assert.equal(fs.existsSync(path.join(root, ".claude/skills")), false);
+});
+
+test("skill namespace upgrade preserves modified obsolete copies and leaves the manifest intact", async () => {
+  const legacy = legacySkillSource();
+  for (const prefix of [".agents/skills", ".claude/skills"]) {
+    const root = target();
+    await install({ sourceRoot: legacy, target: root, harnesses: ["claude-code"], interactive: false });
+    const old = `${prefix}/resume/SKILL.md`;
+    fs.appendFileSync(path.join(root, old), "\nLocal guidance\n");
+    const before = read(root, old);
+    const manifest = read(root, MANIFEST_PATH);
+    await assert.rejects(upgrade({ sourceRoot, target: root }), (error) => error.code === "ASSET_CONFLICT");
+    assert.equal(read(root, old), before);
+    assert.equal(read(root, MANIFEST_PATH), manifest);
+    assert.equal(fs.existsSync(path.join(root, prefix, "journal-resume/SKILL.md")), false);
+  }
+});
+
+test("skill namespace upgrade keeps pre-existing unowned generic skills", async () => {
+  const root = target();
+  const legacy = legacySkillSource();
+  const original = read(legacy, ".agents/skills/resume/SKILL.md");
+  for (const prefix of [".agents/skills", ".claude/skills"]) {
+    fs.mkdirSync(path.join(root, prefix, "resume"), { recursive: true });
+    fs.writeFileSync(path.join(root, prefix, "resume/SKILL.md"), original);
+  }
+  await install({ sourceRoot: legacy, target: root, harnesses: ["claude-code"], interactive: false });
+  await upgrade({ sourceRoot, target: root });
+  uninstall({ target: root });
+  for (const prefix of [".agents/skills", ".claude/skills"]) {
+    assert.equal(read(root, `${prefix}/resume/SKILL.md`), original);
+    assert.equal(fs.existsSync(path.join(root, prefix, "journal-resume/SKILL.md")), false);
+  }
 });
 
 test("instructions-only dry-run makes no changes", async () => {
@@ -1004,7 +1074,7 @@ test("upgrade adopts copied assets that already match the incoming version", asy
     fs.copyFileSync(path.join(sourceRoot, relative), destination);
   }
   await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
-  const relative = ".agents/skills/recall/SKILL.md";
+  const relative = ".agents/skills/journal-recall/SKILL.md";
   const originalRecord = loadManifest(root).files.find((record) => record.path === relative);
   const updated = `${read(root, relative)}\nIncoming recall guidance.\n`;
   fs.writeFileSync(path.join(incoming, relative), updated);

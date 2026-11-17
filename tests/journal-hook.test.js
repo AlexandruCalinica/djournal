@@ -42,6 +42,20 @@ test("session start reports active work from a nested cwd", () => {
   assert.match(output.hookSpecificOutput.additionalContext, new RegExp(work));
 });
 
+test("hook reminders point to installed journal skills without routing opted-out requests", () => {
+  const { root } = fixture();
+  const start = run({ cwd: root, hook_event_name: "SessionStart" }).hookSpecificOutput.additionalContext;
+  const prompt = run({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: "Continue this project" }).hookSpecificOutput.additionalContext;
+  for (const name of ["journal-resume", "journal-recall", "journal-plan"]) {
+    assert.ok(start.includes(name));
+    assert.ok(fs.existsSync(path.join(__dirname, "../.agents/skills", name, "SKILL.md")));
+  }
+  assert.ok(prompt.includes("journal-workflow"));
+  const optedOut = run({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: "journal: off continue this project" }).hookSpecificOutput.additionalContext;
+  assert.doesNotMatch(optedOut, /journal-(?:workflow|resume|recall|plan)/);
+  assert.match(optedOut, /journal-status: off/);
+});
+
 test("session start prompts when multiple active work items are available", () => {
   const { root, work } = fixture();
   fs.writeFileSync(path.join(root, `.journal/work/${work}/work.md`), [

@@ -1,6 +1,6 @@
 ---
 name: journal-workflow
-description: Coordinate the default-on filesystem journal workflow by classifying a request and composing existing resume, plan, research, decision, document, and journal skills. Use for meaningful implementation, durable research or documentation, accepted decisions, migrations, or material status changes that should preserve project context without requiring the user to invoke journal steps manually.
+description: Coordinate djournal project memory for meaningful implementation, investigation, decisions, and status changes. Select and load the required journal-* skills for context, evidence, planning, and closure even when the user does not mention journaling.
 ---
 
 # Coordinate the journal workflow
@@ -14,10 +14,29 @@ the underlying journal skills.
 2. Read `.agents/rules/STATE.md` before any write.
 3. Load other journal rules only through the selected underlying skill.
 
+## Select and load skills
+
+Follow the intent routes and invocation contract in `AUTOMATION.md`. Invoke the
+exact `journal-*` skill through the harness skill tool when available; otherwise
+read `.agents/skills/<skill-name>/SKILL.md`. Do this before the selected work,
+not merely by mentioning the skill or doing a CLI search.
+
+- Continue or recover active work: `journal-resume` when journal context is
+  needed and is not already loaded.
+- Answer from past project decisions or history: `journal-recall` and its
+  canonical evidence, even when native memory suggests an answer.
+- Plan a multi-phase or risky change: `journal-plan` before implementation,
+  unless an applicable accepted plan already exists.
+
+Native conversation resume, auto memory, and plan mode remain useful but do not
+complete these journal steps. Preserve read-only restrictions and the existing
+opt-out, trivial-work, and plan-threshold rules. No repeated invocation is needed
+for unchanged skill instructions already loaded in this context.
+
 ## Classify
 
 - Honor `journal: off` and finish with `<!-- journal-status: off -->`.
-- For read-only work, use `recall` or `resume` only when history matters. Do not
+- For read-only work, use `journal-recall` or `journal-resume` only when history matters. Do not
   write an entry; finish with `<!-- journal-status: not-needed -->` unless
   recalled evidence materially affects current or closed work as described
   below.
@@ -27,16 +46,16 @@ the underlying journal skills.
 
 ## Recall reinforcement
 
-Keep `recall` itself read-only. After a recall/resume answer, decide whether the
+Keep `journal-recall` itself read-only. After a recall/resume answer, decide whether the
 retrieved evidence materially affects current journal work before finalizing:
 
 - Immaterial recall: answer from sources and finish `not-needed`.
-- Current closure in progress: pass the recalled source entries to `journal` so
+- Current closure in progress: pass the recalled source entries to `journal-entry` so
   the new spine entry links them with `references`, `relates_to`, or
   `supersedes` as appropriate.
-- Explicit current/closed target: use `reinforce` to add conservative links or a
+- Explicit current/closed target: use `journal-reinforce` to add conservative links or a
   follow-up spine entry.
-- Accepted contradiction or replacement: use `decision` or `journal` to record
+- Accepted contradiction or replacement: use `journal-decision` or `journal-entry` to record
   the correction and link the recalled evidence.
 
 Material evidence includes recalled sources that confirm a claim being recorded,
@@ -64,15 +83,15 @@ Pass materially used entries to the closing journal skill for typed citations.
 
 ## Run checkpoints
 
-1. **Start:** use `resume` when active-work history can affect the task. Use
-   `init-work` only for an unambiguous new durable work stream.
-2. **Plan:** use `plan` for multi-phase, risky, cross-component, or
+1. **Start:** use `journal-resume` when active-work history can affect the task. Use
+   `journal-init-work` only for an unambiguous new durable work stream.
+2. **Plan:** use `journal-plan` for multi-phase, risky, cross-component, or
    decision-heavy implementation. Do not plan again when an accepted plan exists.
-3. **Support:** route durable evidence to `research-codebase`, `research-web`,
-   `decision`, `document`, or `reinforce` as appropriate.
+3. **Support:** route durable evidence to `journal-research-codebase`, `journal-research-web`,
+   `journal-decision`, `journal-document`, or `journal-reinforce` as appropriate.
 4. **Implement and validate:** make the requested changes and gather bounded,
    deterministic evidence.
-5. **Close:** check the latest spine entry for duplication, then use `journal`
+5. **Close:** check the latest spine entry for duplication, then use `journal-entry`
    once when meaningful state changed.
 
 ## Finish

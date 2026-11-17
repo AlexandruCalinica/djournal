@@ -1,0 +1,4 @@
+interface:
+  display_name: "Journal Resume"
+  short_description: "Restore current project state from djournal"
+  default_prompt: "Use $journal-resume to restore the active work context and identify the next steps."

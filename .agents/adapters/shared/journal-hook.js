@@ -303,7 +303,7 @@ function handle(payload, options = {}) {
       ? updateNotice(runUpdateCheck(root, options.updateRunner))
       : "";
     const suffix = selectionSuffix(root, payload, env);
-    return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${pullMessage}${updateMessage}${suffix}`);
+    return context(event, `Follow AGENTS.md and .agents/rules/AUTOMATION.md.${pullMessage}${updateMessage}${suffix} When project context is needed, load journal-resume; for prior decisions/history, load journal-recall; before work meeting the planning threshold, load journal-plan. Invoke the exact skill name, or read .agents/skills/<skill-name>/SKILL.md if unavailable. Native memory, conversation resume, and plan mode do not replace these journal steps. Honor journal: off.`);
   }
 
   if (event === "UserPromptSubmit") {
@@ -318,7 +318,7 @@ function handle(payload, options = {}) {
         : `The requested journal pull failed and must be resolved before publication: ${result.message}`;
       return context(event, `${pullMessage} Classify this request using the ambient journal workflow and run journal sync if publication was requested.`);
     }
-    return context(event, "Classify this request using the ambient journal workflow. Close meaningful changed state before the final response, without adding ceremony to read-only or trivial work.");
+    return context(event, "Classify this request using the ambient journal workflow. Load journal-workflow and the selected journal-* skills when required; invoke the skill or read its .agents/skills/<skill-name>/SKILL.md. Close meaningful changed state before the final response, without adding ceremony to read-only or trivial work.");
   }
 
   if (event !== "Stop") return {};

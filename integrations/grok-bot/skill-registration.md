@@ -4,28 +4,28 @@ Grok Bot loads shared workflows. It does not load `.agents/skills` by itself
 and it has no session hooks. After `djournal install --harness grok-bot`,
 register each installed skill with the harness **UpdateSkill** action.
 
-Keep the upstream skill files generic. Rewrite a copy for the payload. Do not
+Keep the upstream skill files portable. Rewrite a copy for the payload. Do not
 edit the installed `SKILL.md` files in place, and do not embed a workspace
 path, owner name, or agent id.
 
-## Suggested workflow ids
+## Workflow ids
 
-| Installed skill directory | Suggested workflow id |
+| Installed skill directory | Workflow id |
 | --- | --- |
 | `journal-workflow` | `journal-workflow` |
-| `resume` | `journal-resume` |
-| `init-work` | `journal-init-work` |
-| `switch` | `journal-switch` |
-| `journal` | `journal-entry` |
-| `plan` | `journal-plan` |
-| `recall` | `journal-recall` |
-| `decision` | `journal-decision` |
-| `document` | `journal-document` |
-| `research-codebase` | `journal-research-codebase` |
-| `research-web` | `journal-research-web` |
-| `reinforce` | `journal-reinforce` |
-| `audit` | `journal-audit` |
-| `reconcile` | `journal-reconcile` |
+| `journal-resume` | `journal-resume` |
+| `journal-init-work` | `journal-init-work` |
+| `journal-switch` | `journal-switch` |
+| `journal-entry` | `journal-entry` |
+| `journal-plan` | `journal-plan` |
+| `journal-recall` | `journal-recall` |
+| `journal-decision` | `journal-decision` |
+| `journal-document` | `journal-document` |
+| `journal-research-codebase` | `journal-research-codebase` |
+| `journal-research-web` | `journal-research-web` |
+| `journal-reinforce` | `journal-reinforce` |
+| `journal-audit` | `journal-audit` |
+| `journal-reconcile` | `journal-reconcile` |
 
 Hub-only prose in this recipe is not an upstream skill:
 
@@ -39,7 +39,7 @@ Hub-only prose in this recipe is not an upstream skill:
 1. Set `<project-root>` to the install target (the directory that contains
    `.djournal.json` and `.agents/`).
 2. Read `<project-root>/.agents/skills/<directory>/SKILL.md`.
-3. Take `name` and `description` from the YAML frontmatter. Use the suggested
+3. Take `name` and `description` from the YAML frontmatter. Use the same namespaced
    workflow id from the table. Do not invent a project-specific id.
 4. Rewrite the body into the UpdateSkill payload:
    - Point rule reads at `<project-root>/.agents/rules/...`. Journal root
