@@ -844,6 +844,124 @@ test("upgrade refuses a corrupted managed instruction block without rewriting th
   assert.equal(read(root, "AGENTS.md"), corrupted);
 });
 
+test("reinstall restores missing instruction blocks and preserves unmarked text", async () => {
+  const root = target();
+  await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
+  const agents = "# Restored from Git\n\nKeep these instructions.\n";
+  const claude = "# Personal project guidance\n\nKeep this too.\n";
+  fs.writeFileSync(path.join(root, "AGENTS.md"), agents);
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), claude);
+  const manifest = read(root, MANIFEST_PATH);
+
+  await upgrade({ sourceRoot, target: root, dryRun: true });
+  assert.equal(read(root, "AGENTS.md"), agents);
+  assert.equal(read(root, "CLAUDE.md"), claude);
+  assert.equal(read(root, MANIFEST_PATH), manifest);
+
+  await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
+  await upgrade({ sourceRoot, target: root });
+  assert.equal(count(read(root, "AGENTS.md"), BEGIN), 1);
+  assert.equal(count(read(root, "CLAUDE.md"), BEGIN), 1);
+  uninstall({ target: root });
+  assert.equal(read(root, "AGENTS.md"), agents);
+  assert.equal(read(root, "CLAUDE.md"), claude);
+});
+
+test("upgrade recreates deleted instruction files", async () => {
+  const root = target();
+  await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
+  fs.unlinkSync(path.join(root, "AGENTS.md"));
+  fs.unlinkSync(path.join(root, "CLAUDE.md"));
+  await upgrade({ sourceRoot, target: root });
+  assert.equal(count(read(root, "AGENTS.md"), BEGIN), 1);
+  assert.equal(count(read(root, "CLAUDE.md"), BEGIN), 1);
+});
+
+test("Claude project skills install, upgrade and uninstall independently of account configuration", async () => {
+  const root = target();
+  const previousConfig = process.env.CLAUDE_CONFIG_DIR;
+  const alternateConfig = target();
+  process.env.CLAUDE_CONFIG_DIR = alternateConfig;
+  try {
+    await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
+    assert.equal(fs.existsSync(path.join(root, ".claude/skills")), false);
+    await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false, dryRun: true });
+    assert.equal(fs.existsSync(path.join(root, ".claude/skills")), false);
+    await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
+    await upgrade({ sourceRoot, target: root });
+    const skills = sourceInventory(sourceRoot).filter((file) => file.startsWith(".agents/skills/"));
+    assert.ok(skills.length > 0);
+    for (const source of skills) {
+      const destination = source.replace(".agents/skills/", ".claude/skills/");
+      assert.equal(read(root, destination), read(sourceRoot, source));
+      const record = loadManifest(root).files.find((file) => file.path === destination);
+      assert.equal(record.mode, "copy");
+      assert.equal(record.harness, "claude-code");
+    }
+    assert.deepEqual(fs.readdirSync(alternateConfig), []);
+    uninstall({ target: root, harnesses: ["claude-code"] });
+    assert.equal(fs.existsSync(path.join(root, ".claude/skills")), false);
+    assert.ok(fs.existsSync(path.join(root, ".agents/skills/journal/SKILL.md")));
+  } finally {
+    if (previousConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previousConfig;
+  }
+});
+
+test("Claude skills preserve existing and modified files", async () => {
+  const root = target();
+  const skill = ".claude/skills/journal/SKILL.md";
+  fs.mkdirSync(path.dirname(path.join(root, skill)), { recursive: true });
+  fs.writeFileSync(path.join(root, skill), "User's journal skill\n");
+  await assert.rejects(
+    install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false }),
+    (error) => error.code === "ASSET_CONFLICT",
+  );
+  assert.equal(read(root, skill), "User's journal skill\n");
+  assert.equal(fs.existsSync(path.join(root, "AGENTS.md")), false);
+  fs.writeFileSync(path.join(root, skill), read(sourceRoot, ".agents/skills/journal/SKILL.md"));
+  await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
+  assert.equal(loadManifest(root).files.find((file) => file.path === skill).created, false);
+  uninstall({ target: root, harnesses: ["claude-code"] });
+  assert.equal(read(root, skill), read(sourceRoot, ".agents/skills/journal/SKILL.md"));
+
+  await install({ sourceRoot, target: root, harnesses: ["claude-code"], interactive: false });
+  fs.writeFileSync(path.join(root, skill), "Edited after install\n");
+  await assert.rejects(upgrade({ sourceRoot, target: root }), (error) => error.code === "ASSET_CONFLICT");
+  assert.ok(uninstall({ target: root, harnesses: ["claude-code"] }).conflicts.includes(skill));
+  assert.equal(read(root, skill), "Edited after install\n");
+});
+
+test("upgrade adds Claude skills to older installs and updates supporting resources", async () => {
+  const root = target();
+  const incoming = target();
+  for (const relative of [...sourceInventory(sourceRoot), "AGENTS.md", "package.json", ".claude/settings.json"]) {
+    const destination = path.join(incoming, relative);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(path.join(sourceRoot, relative), destination);
+  }
+  const resource = ".agents/skills/journal/references/example.md";
+  fs.mkdirSync(path.dirname(path.join(incoming, resource)), { recursive: true });
+  fs.writeFileSync(path.join(incoming, resource), "Example v1\n");
+  await install({ sourceRoot: incoming, target: root, harnesses: ["claude-code"], interactive: false });
+  // Model the pre-fix manifest and filesystem, which had no Claude skill copies.
+  const manifest = loadManifest(root);
+  for (const file of manifest.files.filter((file) => file.path.startsWith(".claude/skills/"))) {
+    fs.unlinkSync(path.join(root, file.path));
+  }
+  manifest.files = manifest.files.filter((file) => !file.path.startsWith(".claude/skills/"));
+  fs.writeFileSync(path.join(root, MANIFEST_PATH), JSON.stringify(manifest));
+  await upgrade({ sourceRoot: incoming, target: root });
+  assert.equal(read(root, ".claude/skills/journal/references/example.md"), "Example v1\n");
+  fs.writeFileSync(path.join(incoming, resource), "Example v2\n");
+  await upgrade({ sourceRoot: incoming, target: root });
+  assert.equal(read(root, ".claude/skills/journal/references/example.md"), "Example v2\n");
+  assert.equal(status({ target: root }).clean, true);
+  uninstall({ target: root, harnesses: ["claude-code"] });
+  assert.equal(fs.existsSync(path.join(root, ".claude/skills")), false);
+  assert.equal(read(root, resource), "Example v2\n");
+});
+
 test("instructions-only dry-run makes no changes", async () => {
   const root = target();
   const result = await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false, dryRun: true });

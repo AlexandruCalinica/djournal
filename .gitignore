@@ -1,6 +1,9 @@
 # Local journal history and runtime state
 .journal/
 
+# Generated Claude skill copies; canonical sources live in .agents/skills
+/.claude/skills/
+
 # Node dependencies and test output
 node_modules/
 coverage/

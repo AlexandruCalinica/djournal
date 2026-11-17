@@ -267,6 +267,34 @@ Install only the portable instructions and journal skills:
 djournal install --instructions-only
 ```
 
+### Claude skills and separate accounts
+
+The Claude Code integration installs project skills under `.claude/skills/`,
+using the canonical definitions and supporting files from `.agents/skills/`.
+Claude discovers these project skills regardless of which account you use or
+whether your launcher sets `CLAUDE_CONFIG_DIR` to another personal configuration
+directory. No copying into each account's home directory is required.
+See [Claude Code's skill locations](https://code.claude.com/docs/en/skills#choose-where-skills-load).
+
+Run `djournal install --harness claude-code` to add the integration, or
+`djournal upgrade` to add project skills to an existing Claude installation.
+Restart Claude in the project directory after installation. Removing only the
+Claude integration removes its unchanged installed skills while retaining
+`.agents/skills/`. Existing or locally modified skill files are preserved;
+different content at an installation destination produces an `ASSET_CONFLICT`.
+
+### Missing instruction blocks
+
+Reinstall and upgrade restore a completely missing djournal block in `AGENTS.md`
+or `CLAUDE.md`, including when the file was deleted or restored from Git.
+All existing unmarked text is preserved. If only the markers were removed,
+the old unmarked instructions remain alongside the newly inserted block;
+review that text manually before removing any duplication.
+
+Incomplete, reversed, or duplicate block markers still produce an
+`ASSET_CONFLICT`. Repair those boundaries before retrying; the installer will
+not guess which surrounding instructions it owns.
+
 ## Useful checks
 
 ```bash
