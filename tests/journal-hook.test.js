@@ -368,3 +368,116 @@ test("absent journal installation fails open", () => {
   const output = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: "Done" });
   assert.deepEqual(output, {});
 });
+
+function globalFixture() {
+  const fixtureValue = fixture();
+  const store = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-store-"));
+  fs.mkdirSync(path.join(store, ".journal"), { recursive: true });
+  fs.writeFileSync(path.join(fixtureValue.root, ".djournal.json"), JSON.stringify({ schemaVersion: 1, projectKey: "test", journalStore: store }));
+  return { ...fixtureValue, store };
+}
+
+function recallEntry(name, match, extra = {}) {
+  return {
+    path: `.journal/work/w/journal/${name}.md`,
+    title: `Title ${name}`,
+    summary: `Summary for ${name}`,
+    entryType: "decision",
+    createdAt: "2026-07-01T00:00:00.000Z",
+    score: 100,
+    match,
+    ...extra,
+  };
+}
+
+function recallRunner(entries, calls = []) {
+  return (command, args) => {
+    calls.push([command, ...args]);
+    return { status: 0, stdout: JSON.stringify({ entries }) };
+  };
+}
+
+const glancePrompt = "How does webhook retry backoff work?";
+
+test("prompt submit appends a gated recall glance after the workflow reminder", () => {
+  const { root } = fixture();
+  const calls = [];
+  const entries = [
+    recallEntry("relevant", { webhook: ["title"], retry: ["summary", "body"] }),
+    recallEntry("body-only", { webhook: ["body"], retry: ["body"], backoff: ["body"] }),
+    recallEntry("single-term", { webhook: ["title", "summary"] }),
+    recallEntry("weak", { webhooks: ["title"], retries: ["body"] }, { score: 10 }),
+  ];
+  const output = handle({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: glancePrompt }, { recallRunner: recallRunner(entries, calls), env: {} });
+  const message = output.hookSpecificOutput.additionalContext;
+  assert.match(message, /^Classify this request/);
+  assert.match(message, /Recall glance: lexical journal candidates/);
+  assert.match(message, /- decision · 2026-07-01 · Title relevant — Summary for relevant · \.journal\/work\/w\/journal\/relevant\.md/);
+  assert.doesNotMatch(message, /body-only|single-term|weak/);
+  assert.deepEqual(calls[0], ["journal", "recall", "search", "webhook retry backoff work", "--kind", "entry", "--limit", "10", "--json"]);
+});
+
+test("recall glance skips short, command, opted-out, disabled, and failed prompts", () => {
+  const { root, store } = globalFixture();
+  let calls = 0;
+  const runner = () => { calls += 1; return { status: 0, stdout: JSON.stringify({ entries: [recallEntry("x", { webhook: ["title"], retry: ["title"] })] }) }; };
+  const prompt = (text, env = {}) => handle({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: text }, { recallRunner: runner, env }).hookSpecificOutput.additionalContext;
+
+  assert.doesNotMatch(prompt("ok thanks"), /Recall glance/);
+  assert.doesNotMatch(prompt("/journal-recall webhook retry"), /Recall glance/);
+  assert.doesNotMatch(prompt("journal: off webhook retry"), /Recall glance/);
+  assert.doesNotMatch(prompt(glancePrompt, { DJOURNAL_RECALL_GLANCE: "0" }), /Recall glance/);
+  assert.equal(calls, 0);
+
+  fs.writeFileSync(path.join(store, "config.json"), JSON.stringify({ recall: { glance: { enabled: false } } }));
+  assert.doesNotMatch(prompt(glancePrompt), /Recall glance/);
+  assert.equal(calls, 0);
+  fs.rmSync(path.join(store, "config.json"));
+
+  for (const failure of [{ status: 1, stdout: "" }, { status: 0, stdout: "not json" }, { error: new Error("ETIMEDOUT") }]) {
+    const output = handle({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: glancePrompt }, { recallRunner: () => failure, env: {} });
+    assert.match(output.hookSpecificOutput.additionalContext, /^Classify this request/);
+    assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /Recall glance/);
+  }
+});
+
+test("recall glance does not repeat candidates within a session", () => {
+  const { root, store } = globalFixture();
+  const entries = [
+    recallEntry("first", { webhook: ["title"], retry: ["title"] }),
+    recallEntry("second", { webhook: ["summary"], retry: ["summary"] }),
+  ];
+  const submit = (sessionId, list = entries) => handle(
+    { cwd: root, hook_event_name: "UserPromptSubmit", prompt: glancePrompt, session_id: sessionId },
+    { recallRunner: recallRunner(list), env: {} },
+  ).hookSpecificOutput.additionalContext;
+
+  assert.match(submit("session-a"), /first[\s\S]*second/);
+  assert.doesNotMatch(submit("session-a"), /Recall glance/);
+  const third = recallEntry("third", { webhook: ["title"], backoff: ["title"] });
+  const next = submit("session-a", [...entries, third]);
+  assert.match(next, /third/);
+  assert.doesNotMatch(next, /first|second/);
+  assert.match(submit("session-b"), /first/);
+
+  const seenFiles = fs.readdirSync(path.join(store, "cache/recall/glance"));
+  assert.equal(seenFiles.length, 2);
+  assert.ok(!fs.existsSync(path.join(root, ".journal/cache")));
+});
+
+test("recall glance maps prefix and fuzzy document terms back to prompt terms", () => {
+  const { glanceCandidates, glanceTerms } = require("../.agents/adapters/shared/journal-hook.js");
+  assert.deepEqual(glanceTerms("Please explain why the journal-recall skill uses the cache?"), ["explain", "journal-recall", "skill", "uses", "cache"]);
+  const terms = ["conflicts", "sync"];
+  const kept = glanceCandidates([
+    recallEntry("fuzzy", { conflict: ["summary"], "`synchronization`": ["body"] }),
+    recallEntry("unrelated", { conflict: ["summary"], other: ["title"] }),
+  ], terms);
+  assert.deepEqual(kept.map((entry) => entry.title), ["Title fuzzy"]);
+});
+
+test("recall glance is suppressed under the test runner without an injected runner", () => {
+  const { root } = fixture();
+  const output = handle({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: glancePrompt });
+  assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /Recall glance/);
+});

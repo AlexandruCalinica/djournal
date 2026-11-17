@@ -28,6 +28,11 @@ not merely by mentioning the skill or doing a CLI search.
 - Plan a multi-phase or risky change: `journal-plan` before implementation,
   unless an applicable accepted plan already exists.
 
+Prompt hooks may append a `Recall glance`: up to five lexical journal candidates
+for the current prompt. Scan it; read a listed entry only when its title or
+summary bears on the request, and ignore the list otherwise. It does not replace
+`journal-recall` for history questions, nor the code-change evidence checkpoint.
+
 Native conversation resume, auto memory, and plan mode remain useful but do not
 complete these journal steps. Preserve read-only restrictions and the existing
 opt-out, trivial-work, and plan-threshold rules. No repeated invocation is needed

@@ -206,9 +206,18 @@ hook reports that bound work item. If several work items are lifecycle-active an
 no binding exists, the hook asks the agent to prompt the user before meaningful
 work.
 
+Prompt hooks (Claude Code, Codex, and Pi) also append a short recall glance when
+a prompt has at least two content terms: the hook runs
+`journal recall search --kind entry --json` against the persistent cache and
+lists up to five entries that match at least two prompt terms, including one in
+a title, summary, work title, path, or heading. Raw search scores are not used as
+an absolute threshold. Candidates already shown in a session are recorded under
+`<store>/cache/recall/glance/` and not repeated. Failures and timeouts omit the
+glance. See [Fast Recall](recall.md#per-prompt-recall-glance).
+
 For Claude Code, install also injects a narrow permission grant into
 `.claude/settings.json` for the exact global project store path and safe
-`journal`/`djournal` commands. Codex filesystem access is governed by the Codex
+`journal`/`djournal` commands, including read-only `recall`. Codex filesystem access is governed by the Codex
 runtime sandbox, so Codex sessions must be launched with the global store path
 available when sandboxing would otherwise hide `~/.djournal`.
 
