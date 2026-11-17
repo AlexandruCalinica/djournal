@@ -80,6 +80,40 @@ If the CLI is unavailable or the cache cannot produce candidates, the skill
 falls back to filesystem discovery. Recall remains read-only in either path: it
 does not create entries, share work, sync, commit, or push.
 
+## Per-prompt recall glance
+
+Installed prompt hooks give the agent a cheap view of what the journal may
+contain without loading the recall skill. For each prompt the shared hook:
+
+1. skips `journal: off`, slash/skill commands, and prompts with fewer than two
+   content terms after removing common words;
+2. runs `journal recall search "<terms>" --kind entry --limit 10 --json` with a
+   4-second budget;
+3. keeps entries that match at least two prompt terms, with at least one match
+   in a title, summary, work title, path, or heading, and a score within 25% of
+   the best kept entry;
+4. removes entries already shown in the same session and appends up to five
+   lines such as
+   `- decision · 2026-07-01 · Track installer ownership — Use project-local… · .journal/work/…/decisions/….md`.
+
+The glance is labeled as lexical candidates, not evidence. The agent opens an
+entry only when its title or summary bears on the request, and `journal-recall`
+still owns history answers. Scores from MiniSearch are relative; an unrelated
+prompt can score as highly as a relevant one, so gating depends on matched terms
+and fields instead of a fixed threshold.
+
+Disable it per project or per process:
+
+```bash
+djournal config recall.glance.enabled false
+DJOURNAL_RECALL_GLANCE=0 claude
+```
+
+Shown paths are stored per hashed session id under
+`~/.djournal/projects/<project-key>/cache/recall/glance/`, capped at 200 paths
+and pruned after 14 days. Pi does not supply a session id, so its glance is not
+deduplicated. Any failure, timeout, or malformed output simply omits the glance.
+
 ## What happens on each call
 
 There is no daemon. Each invocation loads the serialized MiniSearch snapshot,

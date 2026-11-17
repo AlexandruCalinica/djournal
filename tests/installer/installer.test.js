@@ -738,6 +738,7 @@ test("three-harness install is idempotent and partial/full uninstall preserves u
   assert.equal(claudeSettings.permissions.additionalDirectories.includes(marker.journalStore), true);
   assert.equal(claudeSettings.permissions.allow.includes("Bash(journal status:*)"), true);
   assert.equal(claudeSettings.permissions.allow.includes("Bash(djournal update:*)"), true);
+  assert.equal(claudeSettings.permissions.allow.includes("Bash(djournal recall:*)"), true);
   assert.equal(
     claudeSettings.hooks.SessionStart[0].hooks[0].statusMessage,
     "Loading journal workflow",

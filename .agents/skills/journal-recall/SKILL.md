@@ -49,6 +49,10 @@ Default to Overview when unclear.
 
 ## Discover cheaply
 
+0. If the prompt context already contains a `Recall glance` list for this
+   request, treat it as a first discovery pass: deep-read relevant candidates
+   or run a narrower search below instead of repeating the same broad query.
+   The glance is lexical and gated; its absence does not mean no evidence exists.
 1. Run `djournal recall search "<query>" --json` from the project. Add `--work`,
    `--type`, `--status`, or `--visibility` only when the request supplies that
    constraint. Use the ranked paths, IDs, matched fields, summaries, and links
