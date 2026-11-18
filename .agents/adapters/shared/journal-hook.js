@@ -462,7 +462,7 @@ function handle(payload, options = {}) {
   if (event === "UserPromptSubmit") {
     const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
     if (/\bjournal\s*:\s*off\b/i.test(prompt)) {
-      return context(event, "Journal opt-out applies to this request. End with the journal-status: off marker.");
+      return context(event, "Journal opt-out applies to this request. Do not load journal-* skills or read or write the journal store unless the user names a journal skill exactly. Generic wording such as \"resume\" does not override the opt-out. End with the journal-status: off marker.");
     }
     if (requestsJournalSync(prompt)) {
       const result = runJournal(root, ["pull"], options.journalRunner || options.syncRunner);
