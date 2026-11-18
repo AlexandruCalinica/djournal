@@ -2,8 +2,8 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const { makeTempDir } = require("./helpers/temp");
 const test = require("node:test");
 
 const {
@@ -19,7 +19,7 @@ const {
 } = require("../lib/update-checker.js");
 
 function home() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "djournal-update-"));
+  return makeTempDir("djournal-update-");
 }
 
 function response(value, options = {}) {

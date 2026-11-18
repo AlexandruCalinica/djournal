@@ -2,8 +2,8 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const { makeTempDir } = require("../helpers/temp");
 const test = require("node:test");
 const semver = require("semver");
 
@@ -11,7 +11,7 @@ const sourceRoot = path.resolve(__dirname, "../..");
 const sourceVersion = JSON.parse(fs.readFileSync(path.join(sourceRoot, "package.json"), "utf8")).version;
 const newerVersion = semver.inc(sourceVersion, "minor");
 const olderVersion = semver.minVersion(`<${sourceVersion}`)?.version;
-const djournalHome = fs.mkdtempSync(path.join(os.tmpdir(), "djournal-home-"));
+const djournalHome = makeTempDir("djournal-home-");
 process.env.DJOURNAL_HOME = djournalHome;
 const { launchUpdateRefresh, parseArgs, print } = require("../../bin/journal.js");
 const {
@@ -48,7 +48,7 @@ const {
 } = require("../../lib/installer/merge.js");
 
 function target() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "journal-installer-"));
+  return makeTempDir("journal-installer-");
 }
 
 function read(root, relative) {

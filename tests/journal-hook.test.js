@@ -2,14 +2,14 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const { makeTempDir } = require("./helpers/temp");
 const test = require("node:test");
 
 const { handle } = require("../.agents/adapters/shared/journal-hook.js");
 
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-"));
+  const root = makeTempDir("journal-hook-");
   const work = "2026-07-01-01-test-work";
   const entry = `.journal/work/${work}/journal/2026-07-01-01-test.md`;
   fs.mkdirSync(path.join(root, ".agents/rules"), { recursive: true });
@@ -249,7 +249,7 @@ test("closed marker requires an existing spine entry", () => {
 
 test("closed marker validates global store without repo-local projection", () => {
   const { root, entry, work } = fixture();
-  const store = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-store-"));
+  const store = makeTempDir("journal-hook-store-");
   const globalEntry = path.join(store, entry);
   fs.rmSync(path.join(root, ".journal"), { recursive: true, force: true });
   fs.mkdirSync(path.dirname(globalEntry), { recursive: true });
@@ -329,7 +329,7 @@ test("unshared closed work does not auto-sync even when active work is shared", 
 
 test("global closed marker work owns auto-sync when active work differs", () => {
   const { root } = fixture();
-  const store = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-store-"));
+  const store = makeTempDir("journal-hook-store-");
   const active = "2026-07-01-01-active-work";
   const closed = "2026-07-02-01-closed-work";
   const closedEntry = `.journal/work/${closed}/journal/2026-07-01-01-test.md`;
@@ -366,14 +366,14 @@ test("status marker must be the final response content", () => {
 });
 
 test("absent journal installation fails open", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-empty-"));
+  const root = makeTempDir("journal-hook-empty-");
   const output = run({ cwd: root, hook_event_name: "Stop", last_assistant_message: "Done" });
   assert.deepEqual(output, {});
 });
 
 function globalFixture() {
   const fixtureValue = fixture();
-  const store = fs.mkdtempSync(path.join(os.tmpdir(), "journal-hook-store-"));
+  const store = makeTempDir("journal-hook-store-");
   fs.mkdirSync(path.join(store, ".journal"), { recursive: true });
   fs.writeFileSync(path.join(fixtureValue.root, ".djournal.json"), JSON.stringify({ schemaVersion: 1, projectKey: "test", journalStore: store }));
   return { ...fixtureValue, store };

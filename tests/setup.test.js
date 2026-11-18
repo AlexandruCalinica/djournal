@@ -2,8 +2,8 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const { makeTempDir } = require("./helpers/temp");
 const { PassThrough } = require("node:stream");
 const { spawnSync } = require("node:child_process");
 const { stripVTControlCharacters } = require("node:util");
@@ -97,7 +97,7 @@ test("argument-free aliases open the wizard while explicit commands remain nonin
 });
 
 test("recall searches canonical Markdown across work items and opens the selected result", async () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "wizard-recall-"));
+  const target = makeTempDir("wizard-recall-");
   const store = path.join(target, "store");
   const root = path.join(store, ".journal");
   const work = path.join(root, "work/chosen");
@@ -203,8 +203,8 @@ test("configuration stages changes and writes nothing when cancelled or declined
 });
 
 test("install uses custom integrations and follows with real persisted configuration", async () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "setup-project-"));
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "setup-store-"));
+  const target = makeTempDir("setup-project-");
+  const home = makeTempDir("setup-store-");
   const original = process.env.DJOURNAL_HOME;
   process.env.DJOURNAL_HOME = home;
   const ui = scripted(["install", "custom", ["codex", "pi"], true, "colocated", false, true, "exit"]);
@@ -411,7 +411,7 @@ test("entry browsing returns after editor success or failure and handles empty j
 });
 
 test("entry listing uses canonical storage, legacy titles, dates, and all supporting areas", () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "setup-entries-"));
+  const target = makeTempDir("setup-entries-");
   const store = path.join(target, "canonical store");
   const root = path.join(store, ".journal");
   const write = (relative, content) => { const file = path.join(root, relative); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, content); return file; };
@@ -445,7 +445,7 @@ test("entry listing uses canonical storage, legacy titles, dates, and all suppor
 });
 
 test("editor command honors precedence and quoting without evaluating filename or arguments", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "setup-editor-"));
+  const root = makeTempDir("setup-editor-");
   const relative = "entry ' $(touch INJECTION); space.md";
   const capture = path.join(root, "argv.json");
   const script = path.join(root, "fake editor.js");

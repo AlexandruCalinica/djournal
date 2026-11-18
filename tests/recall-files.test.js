@@ -2,8 +2,8 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const { makeTempDir } = require("./helpers/temp");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const YAML = require("yaml");
@@ -13,7 +13,7 @@ const { extractReferences, normalizeInputs } = require("../lib/recall/files");
 const { parseArgs } = require("../bin/journal");
 
 function fixture(t) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "djournal-files-"));
+  const base = makeTempDir("djournal-files-");
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const target = path.join(base, "checkout");
   const root = path.join(base, "store");

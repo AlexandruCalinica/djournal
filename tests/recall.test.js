@@ -2,15 +2,15 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const { makeTempDir } = require("./helpers/temp");
 const test = require("node:test");
 
 const { searchRecall } = require("../lib/recall/index.js");
 const { cachePaths } = require("../lib/recall/snapshot.js");
 
 function fixture() {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "djournal-recall-"));
+  const base = makeTempDir("djournal-recall-");
   const target = path.join(base, "checkout");
   const root = path.join(base, "private-store");
   const journalRoot = path.join(root, ".journal");
