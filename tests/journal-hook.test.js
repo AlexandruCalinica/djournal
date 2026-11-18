@@ -199,6 +199,21 @@ test("prompt submit preserves explicit opt-out", () => {
   assert.match(output.hookSpecificOutput.additionalContext, /names a journal skill exactly/);
 });
 
+test("prompt submit honors the opt-out only at the start of a line", () => {
+  const { root } = fixture();
+  const context = (prompt) => run({ cwd: root, hook_event_name: "UserPromptSubmit", prompt }).hookSpecificOutput.additionalContext;
+  for (const prompt of ["journal: off resume", "  Journal : OFF fix this", "Fix the hook.\njournal: off"]) {
+    assert.match(context(prompt), /Journal opt-out applies/, prompt);
+  }
+  for (const prompt of [
+    "I pasted this:\nTightened the journal: off opt-out and merged it.",
+    "why does journal: off still load skills?",
+    "journal: offline mode",
+  ]) {
+    assert.doesNotMatch(context(prompt), /Journal opt-out applies/, prompt);
+  }
+});
+
 test("explicit journal sync prompts pull before agent handling while negated prompts do not", () => {
   const { root } = fixture();
   let calls = 0;
