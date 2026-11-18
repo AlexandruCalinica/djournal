@@ -25,8 +25,11 @@ already loaded for this task when it is still current.
    item when the session has one, otherwise use `<journal-root>/state.json` only
    as a fallback.
    - If multiple work items have `status: active` and no valid session binding
-     is available, ask the user to choose one before doing meaningful writes.
-     After the user chooses, bind the session with
+     is available, list the active candidates and ask the user to choose one
+     before loading any work item's context. You may mark one candidate as the
+     likely match (for example by current branch or most recent entry), but do
+     not present a guessed item as where the user left off. After the user
+     chooses, bind the session with
      `djournal work bind <slug> --session <id>` when a session id is available,
      or use `journal-switch` only when the user wants to change the global fallback.
 3. If `work.md` is legacy/missing, infer a temporary title/slug and clearly mark

@@ -130,6 +130,12 @@ function activeWorkItems(root) {
   }
 }
 
+// The opt-out must lead the prompt or a line of it. A mid-sentence mention,
+// such as pasted text that discusses "journal: off", is not an opt-out.
+function isJournalOptOut(prompt) {
+  return /^[ \t]*journal[ \t]*:[ \t]*off\b/im.test(prompt);
+}
+
 function selectionSuffix(root, payload, env) {
   const id = sessionId(payload, env);
   const selected = activeWork(root, { sessionId: id, state: false });
@@ -461,7 +467,7 @@ function handle(payload, options = {}) {
 
   if (event === "UserPromptSubmit") {
     const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
-    if (/\bjournal\s*:\s*off\b/i.test(prompt)) {
+    if (isJournalOptOut(prompt)) {
       return context(event, "Journal opt-out applies to this request. Do not load journal-* skills or read or write the journal store unless the user names a journal skill exactly. Generic wording such as \"resume\" does not override the opt-out. End with the journal-status: off marker.");
     }
     if (requestsJournalSync(prompt)) {

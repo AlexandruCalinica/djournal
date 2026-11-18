@@ -46,7 +46,9 @@ persisting a journal plan until writes are allowed, and state that limitation.
   `journal-*` skill loads for that request. Generic wording such as "resume",
   "what's next", or "why did we" does not override the opt-out; only a request
   that names a journal skill exactly (for example "use journal-resume") does.
-  The opt-out applies only to the message that contains it.
+  The opt-out applies only to the message that contains it, and only when
+  `journal: off` starts the message or one of its lines. A mid-sentence
+  mention, including pasted text that discusses the opt-out, does not count.
 - If the resolved journal root's `state.json` selects active work, use `journal-resume`
   when historical context can affect the result.
 - If no active work exists and the request clearly starts a new durable work

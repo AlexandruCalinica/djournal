@@ -95,3 +95,9 @@ test("work initialization and switching pull before enumerating canonical work",
     assert.match(instructions, /Stop and\s+report .*pull conflict/i);
   }
 });
+
+test("resume asks for a work item before loading context when several are active", () => {
+  const resume = read(".agents/skills/journal-resume/SKILL.md");
+  assert.match(resume, /ask the user to choose one\s+before loading any work item's context/);
+  assert.match(resume, /do\s+not present a guessed item as where the user left off/);
+});
