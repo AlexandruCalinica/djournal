@@ -42,8 +42,11 @@ persisting a journal plan until writes are allowed, and state that limitation.
 
 ## Start checkpoint
 
-- If the user says `journal: off`, skip ambient journal reads and writes for the
-  request unless another explicit instruction requires them.
+- If the user says `journal: off`, skip all journal reads, writes, and
+  `journal-*` skill loads for that request. Generic wording such as "resume",
+  "what's next", or "why did we" does not override the opt-out; only a request
+  that names a journal skill exactly (for example "use journal-resume") does.
+  The opt-out applies only to the message that contains it.
 - If the resolved journal root's `state.json` selects active work, use `journal-resume`
   when historical context can affect the result.
 - If no active work exists and the request clearly starts a new durable work

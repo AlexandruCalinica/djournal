@@ -195,6 +195,8 @@ test("prompt submit preserves explicit opt-out", () => {
   const { root } = fixture();
   const output = run({ cwd: root, hook_event_name: "UserPromptSubmit", prompt: "journal: off fix this" });
   assert.match(output.hookSpecificOutput.additionalContext, /opt-out/);
+  assert.match(output.hookSpecificOutput.additionalContext, /Do not load journal-\* skills/);
+  assert.match(output.hookSpecificOutput.additionalContext, /names a journal skill exactly/);
 });
 
 test("explicit journal sync prompts pull before agent handling while negated prompts do not", () => {
