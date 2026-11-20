@@ -292,7 +292,7 @@ test("result output identifies synchronized work, skipped operations, and sharin
 });
 
 test("empty work lists and missing installs offer a recovery path", async () => {
-  const ui = scripted(["list", "configure", "exit"]);
+  const ui = scripted(["list", "back", "configure", "exit"]);
   const result = await setup({ target: "/tmp" }, { ui, api: {
     listWork() { throw new installer.InstallerError("empty", "NO_ACTIVE_WORK"); },
     configure() { throw new installer.InstallerError("missing", "NOT_INSTALLED"); },
@@ -813,4 +813,98 @@ test("search keeps a bounded, steady viewport with long metadata in narrow termi
       input.write("\t"); await pending;
     } finally { ui.close(); }
   }
+});
+
+function importFixture(t) {
+  const target = makeTempDir("setup-import-");
+  t.after(() => fs.rmSync(target, { recursive: true, force: true }));
+  const store = path.join(target, "store");
+  fs.mkdirSync(store);
+  fs.writeFileSync(path.join(target, ".djournal.json"), JSON.stringify({ schemaVersion: 1, projectKey: "import-test", journalStore: store }));
+  const configText = JSON.stringify({ sync: { enabled: false }, sharing: { sharedWorkItems: {} } });
+  fs.writeFileSync(path.join(store, "config.json"), configText);
+  const write = (root, relative, content) => {
+    const file = path.join(root, ".journal/work/chosen", relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, content);
+  };
+  write(target, "work.md", "---\nslug: chosen\ntitle: Cue work\nstatus: active\nvisibility: local_only\n---\n");
+  write(target, "journal/entry.md", "# Imported entry\n");
+  return { target, store, write, configText };
+}
+
+test("List discovers repository entries with sync disabled, confirms import and opens entries", async (t) => {
+  const { target, store, configText } = importFixture(t);
+  const ui = scripted(["list", "import", true, "work/chosen/journal/entry.md", "back", "back", "exit"]);
+  let opened = 0;
+  const result = await setup({ target }, { ui, api: { openEntry(entry) {
+    assert.equal(entry.root, path.join(store, ".journal")); opened++;
+  } } });
+  ui.verify(); assert.equal(result.failed, false); assert.equal(opened, 1);
+  assert.ok(ui.messages.some(message => message.includes("Journal entries found")));
+  assert.ok(ui.messages.some(message => message.includes("Imported 1 entry across 1 work item")));
+  assert.equal(fs.readFileSync(path.join(store, "config.json"), "utf8"), configText);
+  assert.equal(fs.existsSync(path.join(store, ".journal/state.json")), false);
+});
+
+test("import remains accessible on populated lists and skips identical entries", async (t) => {
+  const { target } = importFixture(t);
+  const preview = installer.importJournal({ target, dryRun: true });
+  installer.importJournal({ target, fingerprint: preview.fingerprint });
+  const ui = scripted(["list", "import", "repository", "back", "exit"]);
+  assert.deepEqual(await setup({ target }, { ui }), { failed: false });
+  ui.verify(); assert.ok(ui.messages.some(message => message.includes("already imported")));
+});
+
+test("empty List imports another journal location and returns to the work picker for multiple works", async (t) => {
+  const { target, store } = importFixture(t);
+  const alternate = path.join(target, "elsewhere");
+  fs.renameSync(path.join(target, ".journal"), path.join(target, "saved-journal"));
+  fs.mkdirSync(alternate);
+  fs.renameSync(path.join(target, "saved-journal"), path.join(alternate, ".journal"));
+  const other = path.join(alternate, ".journal/work/other");
+  fs.mkdirSync(other); fs.writeFileSync(path.join(other, "work.md"), "# Other\n");
+  const ui = scripted(["list", "location", path.join(alternate, ".journal"), true, "back", "exit"]);
+  assert.deepEqual(await setup({ target }, { ui }), { failed: false }); ui.verify();
+  assert.equal(installer.listWork({ target }).workItems.length, 2);
+  assert.equal(fs.existsSync(path.join(store, ".journal/work/chosen/journal/entry.md")), true);
+});
+
+test("declining or escaping import leaves canonical storage untouched", async (t) => {
+  for (const answer of [false, new Back()]) {
+    const { target, store } = importFixture(t);
+    const ui = scripted(["list", "import", answer, "back", "exit"]);
+    assert.deepEqual(await setup({ target }, { ui }), { failed: false }); ui.verify();
+    assert.equal(fs.existsSync(path.join(store, ".journal")), false);
+  }
+});
+
+test("import conflicts offer both paths for review without applying partial changes", async (t) => {
+  const { target, store, write } = importFixture(t);
+  write(store, "journal/entry.md", "# Local version\n");
+  const ui = scripted(["list", "import", "review", "back", "back", "exit"]);
+  assert.deepEqual(await setup({ target }, { ui }), { failed: false }); ui.verify();
+  assert.ok(ui.messages.some(message => message.includes(`Source: ${target}/.journal/work/chosen/journal/entry.md`) && message.includes(`Local: ${store}/.journal/work/chosen/journal/entry.md`)));
+  assert.equal(fs.existsSync(path.join(store, ".journal/work/chosen/work.md")), false);
+  assert.equal(fs.readFileSync(path.join(store, ".journal/work/chosen/journal/entry.md"), "utf8"), "# Local version\n");
+});
+
+test("terminal renders discovery, preview and imported entries through keyboard navigation", async (t) => {
+  const { target } = importFixture(t);
+  const { input, ui, tick, screen } = interactive();
+  const finished = setup({ target }, { ui });
+  const waitFor = async (text) => {
+    for (let attempt = 0; attempt < 150 && !screen().includes(text); attempt++) await tick();
+    assert.ok(screen().includes(text), `terminal did not show ${text}`);
+  };
+  try {
+    await waitFor("What would you like to do?"); input.write("\r");
+    await waitFor("Import from this repository"); input.write("\r");
+    await waitFor("Import these entries?"); input.write("y\r");
+    await waitFor("Imported entry");
+    assert.match(stripVTControlCharacters(screen()), /Imported 1 entry across 1 work item/);
+    input.write("\x1b"); await tick();
+    await waitFor("Choose a work item");
+    input.write("\x03");
+    assert.equal((await finished).cancelled, true);
+  } finally { input.write("\x03"); await finished; ui.close(); }
 });

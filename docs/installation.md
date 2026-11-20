@@ -41,6 +41,16 @@ checkbox markers remain visible without color.
 - **List:** choose a work item, then open an entry in your editor, share, pull, sync, or bind an active item to
   an agent session. Sharing marks the item; Sync copies it to the Git projection.
   If synchronization is disabled, the wizard offers configuration first.
+  **Import entries…** adds existing journal work from this repository or another
+  local project / `.journal` directory. When the local store is empty, List
+  detects repository entries and offers **Import from this repository** directly.
+  Review the work titles, source, and counts before confirming. Import works with
+  synchronization disabled and leaves sharing, sync settings, and active-work
+  selection unchanged. Identical files are skipped; differing files block the
+  entire import and offer source/local paths for review. Source files are kept.
+  After importing one work item, its entry picker opens immediately; multiple
+  work items appear in the refreshed List. Use **Pull updates** within a work item
+  for subsequent configured synchronization.
 - **Recall:** search journal knowledge across work items and open matching
   entries or work descriptions in your editor. Press Tab to adjust filters, or refresh/rebuild the search index from the Recall menu.
 - **Status:** inspect the project's installation, integrations, and versions.
