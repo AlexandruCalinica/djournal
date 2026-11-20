@@ -6,6 +6,7 @@ const path = require("node:path");
 const { makeTempDir } = require("../helpers/temp");
 const test = require("node:test");
 const semver = require("semver");
+const { spawnSync } = require("node:child_process");
 
 const sourceRoot = path.resolve(__dirname, "../..");
 const sourceVersion = JSON.parse(fs.readFileSync(path.join(sourceRoot, "package.json"), "utf8")).version;
@@ -62,6 +63,88 @@ function json(root, relative) {
 function count(text, value) {
   return text.split(value).length - 1;
 }
+
+test("installed hooks execute inside ES module projects without changing the host module type", async () => {
+  const root = target();
+  const hostPackage = '{"type":"module"}\n';
+  fs.writeFileSync(path.join(root, "package.json"), hostPackage);
+  await install({ target: root, sourceRoot, harnesses: ["claude-code", "codex", "pi"], interactive: false });
+  for (const harness of ["claude-code", "codex"]) {
+    for (const event of ["SessionStart", "UserPromptSubmit", "Stop"]) {
+      const result = spawnSync(process.execPath, [path.join(root, ".agents/adapters/shared/journal-hook.js"), "--harness", harness], {
+        cwd: root,
+        input: JSON.stringify({ cwd: root, hook_event_name: event, prompt: "hello", last_assistant_message: "Done. <!-- journal-status: not-needed -->" }),
+        encoding: "utf8",
+        env: { ...process.env, NO_UPDATE_NOTIFIER: "1" },
+      });
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, result.stderr);
+      assert.doesNotThrow(() => JSON.parse(result.stdout));
+      if (event === "SessionStart") assert.match(result.stdout, /Follow AGENTS.md/);
+    }
+  }
+  fs.writeFileSync(path.join(root, "host.js"), `
+import { registerPiAdapter } from './.agents/adapters/pi/journal-hook.js';
+import assert from 'node:assert/strict';
+const events = [];
+registerPiAdapter({ on: (name) => events.push(name) });
+assert.ok(events.includes('session_start'));
+assert.equal(typeof require, 'undefined');
+`);
+  const pi = spawnSync(process.execPath, ["host.js"], { cwd: root, encoding: "utf8" });
+  assert.ifError(pi.error);
+  assert.equal(pi.status, 0, pi.stderr);
+  assert.equal(read(root, "package.json"), hostPackage);
+});
+
+test("upgrade adds the CommonJS boundary to legacy installs and respects dry runs", async () => {
+  const root = target();
+  await install({ target: root, sourceRoot, harnesses: ["claude-code"], interactive: false });
+  fs.writeFileSync(path.join(root, "package.json"), '{"type":"module"}\n');
+  fs.rmSync(path.join(root, ".agents/package.json"));
+  const manifest = json(root, MANIFEST_PATH);
+  manifest.files = manifest.files.filter((record) => record.path !== ".agents/package.json");
+  fs.writeFileSync(path.join(root, MANIFEST_PATH), JSON.stringify(manifest));
+  const preview = await upgrade({ target: root, sourceRoot, dryRun: true });
+  assert.ok(preview.operations.includes(".agents/package.json"));
+  assert.equal(fs.existsSync(path.join(root, ".agents/package.json")), false);
+  await upgrade({ target: root, sourceRoot });
+  assert.equal(json(root, ".agents/package.json").type, "commonjs");
+  assert.ok(loadManifest(root).files.some((record) => record.path === ".agents/package.json" && record.created));
+  const run = spawnSync(process.execPath, [path.join(root, ".agents/adapters/shared/journal-hook.js")], {
+    cwd: root, input: JSON.stringify({ cwd: root, hook_event_name: "SessionStart" }), encoding: "utf8",
+    env: { ...process.env, NO_UPDATE_NOTIFIER: "1" },
+  });
+  assert.ifError(run.error);
+  assert.equal(run.status, 0, run.stderr);
+});
+
+test("CommonJS boundary follows ownership rules for conflicts and uninstall", async () => {
+  const root = target();
+  const boundary = path.join(root, ".agents/package.json");
+  fs.mkdirSync(path.dirname(boundary), { recursive: true });
+  fs.writeFileSync(boundary, '{"type":"module"}\n');
+  await assert.rejects(install({ target: root, sourceRoot, harnesses: ["claude-code"], interactive: false }), /destination already exists/);
+  assert.equal(json(root, ".agents/package.json").type, "module");
+  fs.writeFileSync(boundary, read(sourceRoot, ".agents/package.json"));
+  await install({ target: root, sourceRoot, harnesses: ["claude-code"], interactive: false });
+  await uninstall({ target: root, all: true });
+  assert.equal(fs.existsSync(boundary), true);
+
+  const owned = target();
+  await install({ target: owned, sourceRoot, harnesses: ["claude-code", "codex"], interactive: false });
+  await uninstall({ target: owned, harnesses: ["claude-code"] });
+  assert.equal(fs.existsSync(path.join(owned, ".agents/package.json")), true);
+  await uninstall({ target: owned, all: true });
+  assert.equal(fs.existsSync(path.join(owned, ".agents/package.json")), false);
+
+  const modified = target();
+  await install({ target: modified, sourceRoot, harnesses: ["claude-code"], interactive: false });
+  fs.writeFileSync(path.join(modified, ".agents/package.json"), '{"type":"module"}\n');
+  await assert.rejects(upgrade({ target: modified, sourceRoot }), /modified installed asset/);
+  await uninstall({ target: modified, all: true });
+  assert.equal(json(modified, ".agents/package.json").type, "module");
+});
 
 function legacySkillSource() {
   const legacy = target();

@@ -19,6 +19,7 @@ for (const file of [
   "LICENSE",
   "README.md",
   "bin/journal.js",
+  ".agents/package.json",
   ".agents/adapters/pi/journal-hook.js",
   ".pi/extensions/djournal.ts",
   ".grokbot/README.md",
@@ -27,6 +28,9 @@ for (const file of [
 ]) {
   if (!fs.existsSync(path.join(root, file))) throw new Error(`package source is missing: ${file}`);
 }
+
+const agentsPackage = JSON.parse(fs.readFileSync(path.join(root, ".agents/package.json"), "utf8"));
+if (agentsPackage.type !== "commonjs") throw new Error("installed adapters require a CommonJS package boundary");
 
 const license = fs.readFileSync(path.join(root, "LICENSE"), "utf8");
 if (!license.includes("Apache License") || !license.includes("Version 2.0, January 2004")) {

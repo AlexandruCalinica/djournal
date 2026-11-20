@@ -341,6 +341,19 @@ invoke the journal skill directly and confirm it cites or writes the expected
 canonical journal entry. See [Claude's skill selection and troubleshooting](https://code.claude.com/docs/en/skills)
 and [native commands](https://code.claude.com/docs/en/commands).
 
+### Hooks in ES module projects
+
+djournal's hook adapters use CommonJS. The installer includes
+`.agents/package.json` with `"type": "commonjs"` so they also run inside
+projects whose root `package.json` declares `"type": "module"`.
+The host project's module type is preserved.
+
+If a hook fails with `ReferenceError: require is not defined in ES module scope`,
+update to a CLI release containing this boundary, then run `djournal upgrade`
+in the affected project and restart the agent. Updating the global CLI alone
+does not replace project-local hook assets. A conflicting existing
+`.agents/package.json` is preserved and reported for manual resolution.
+
 ### Missing instruction blocks
 
 Reinstall and upgrade restore a completely missing djournal block in `AGENTS.md`
