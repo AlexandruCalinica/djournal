@@ -1148,3 +1148,94 @@ test("injected transaction failure rolls every file back", async () => {
   assert.equal(fs.existsSync(path.join(root, MANIFEST_PATH)), false);
   assert.equal(fs.existsSync(path.join(root, ".journal/.install/transaction.json")), false);
 });
+
+function importProject(t) {
+  const directory = target();
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const store = path.join(directory, "store");
+  fs.mkdirSync(store);
+  fs.writeFileSync(path.join(directory, PROJECT_MARKER_PATH), JSON.stringify({ schemaVersion: 1, projectKey: "imports", journalStore: store }));
+  const write = (root, relative, body) => {
+    const file = path.join(root, ".journal", relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body);
+  };
+  write(directory, "work/chosen/work.md", "---\nslug: chosen\ntitle: Chosen\n---\n");
+  write(directory, "work/chosen/journal/entry.md", "# Original\n");
+  return { directory, store, write };
+}
+
+test("one-time import previews without writes, preserves metadata and assets, and is idempotent", (t) => {
+  const { importJournal } = require("../../lib/installer/index.js");
+  const { directory, store, write } = importProject(t);
+  write(directory, "work/chosen/docs/chart.svg", "<svg/>\n");
+  write(directory, "work/chosen/decisions/decision.md", "# Decision\n");
+  write(directory, "state.json", '{"active_work_name":"chosen"}');
+  write(directory, "config.json", '{"sync":{"enabled":true}}');
+  write(directory, ".install/manifest.json", "{}");
+  fs.writeFileSync(path.join(store, "config.json"), '{"sync":{"enabled":false}}');
+  const preview = importJournal({ target: directory, dryRun: true });
+  assert.equal(preview.entryCount, 2); assert.equal(preview.files.length, 4);
+  assert.equal(fs.existsSync(path.join(store, ".journal")), false);
+  const result = importJournal({ target: directory, fingerprint: preview.fingerprint });
+  assert.equal(result.newEntryCount, 2);
+  assert.equal(read(store, ".journal/work/chosen/docs/chart.svg"), "<svg/>\n");
+  assert.equal(read(store, ".journal/work/chosen/work.md"), read(directory, ".journal/work/chosen/work.md"));
+  assert.deepEqual(json(store, "config.json"), { sync: { enabled: false } });
+  for (const file of [".journal/state.json", ".journal/config.json", ".journal/.install", ".sync"]) assert.equal(fs.existsSync(path.join(store, file)), false);
+  const again = importJournal({ target: directory, dryRun: true });
+  assert.equal(again.newEntryCount, 0); assert.ok(again.files.every(file => file.status === "unchanged"));
+  assert.equal(importJournal({ target: directory, fingerprint: again.fingerprint }).newEntryCount, 0);
+});
+
+test("import blocks the entire batch on divergent content", (t) => {
+  const { importJournal } = require("../../lib/installer/index.js");
+  const { directory, store, write } = importProject(t);
+  write(store, "work/chosen/journal/entry.md", "# Local\n");
+  write(directory, "work/another/work.md", "# Another\n");
+  const preview = importJournal({ target: directory, dryRun: true });
+  assert.deepEqual(preview.conflicts, ["work/chosen/journal/entry.md"]);
+  const result = importJournal({ target: directory, fingerprint: preview.fingerprint });
+  assert.equal(result.conflicts.length, 1);
+  assert.equal(fs.existsSync(path.join(store, ".journal/work/another")), false);
+  assert.equal(fs.existsSync(path.join(store, ".journal/work/chosen/work.md")), false);
+  assert.equal(read(store, ".journal/work/chosen/journal/entry.md"), "# Local\n");
+});
+
+test("import rejects changed previews and requires confirmation of current contents", (t) => {
+  const { importJournal } = require("../../lib/installer/index.js");
+  for (const change of ["source", "destination", "removed"]) {
+    const { directory, store, write } = importProject(t);
+    const preview = importJournal({ target: directory, dryRun: true });
+    if (change === "removed") fs.renameSync(path.join(directory, ".journal"), path.join(directory, "moved"));
+    else write(change === "source" ? directory : store, "work/chosen/journal/entry.md", "# Changed\n");
+    assert.throws(() => importJournal({ target: directory, fingerprint: preview.fingerprint }), { code: "IMPORT_CHANGED" });
+    assert.equal(fs.existsSync(path.join(store, ".journal/work/chosen/work.md")), false);
+  }
+});
+
+test("import rejects symlinks in source and destination, including dangling links", (t) => {
+  const { importJournal } = require("../../lib/installer/index.js");
+  for (const kind of ["source-file", "source-root", "source-work", "destination-root", "destination-directory", "dangling-destination"]) {
+    const { directory, store } = importProject(t);
+    const outside = path.join(directory, "outside"); fs.mkdirSync(outside);
+    let link;
+    if (kind === "source-file") link = path.join(directory, ".journal/work/chosen/link.md");
+    if (kind === "source-work") link = path.join(directory, ".journal/work/linked");
+    if (kind === "source-root") { fs.renameSync(path.join(directory, ".journal"), path.join(directory, "original")); link = path.join(directory, ".journal"); }
+    if (kind === "destination-root") link = path.join(store, ".journal");
+    if (kind === "destination-directory") { fs.mkdirSync(path.join(store, ".journal")); link = path.join(store, ".journal/work"); }
+    if (kind === "dangling-destination") { fs.mkdirSync(path.join(store, ".journal/work/chosen"), { recursive: true }); link = path.join(store, ".journal/work/chosen/work.md"); }
+    fs.symlinkSync(kind === "dangling-destination" ? path.join(outside, "missing") : outside, link);
+    assert.throws(() => importJournal({ target: directory, dryRun: true }), { code: "UNSAFE_PATH" }, kind);
+    assert.deepEqual(fs.readdirSync(outside), []);
+  }
+});
+
+test("import handles absent journals, local canonical storage and mismatched work slugs", (t) => {
+  const { importJournal } = require("../../lib/installer/index.js");
+  const { directory, store, write } = importProject(t);
+  assert.deepEqual(importJournal({ target: directory, source: path.join(directory, "missing"), dryRun: true }).workItems, []);
+  assert.equal(importJournal({ target: directory, source: store, dryRun: true }).alreadyLocal, true);
+  write(directory, "work/chosen/work.md", "---\nslug: different\n---\n");
+  assert.throws(() => importJournal({ target: directory, dryRun: true }), { code: "INVALID_JOURNAL" });
+});
