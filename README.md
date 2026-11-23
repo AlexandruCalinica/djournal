@@ -193,7 +193,14 @@ If you do not want a global install, use `npx`:
 npx djournal install
 ```
 
-Then use your coding agent normally.
+Or let your coding agent do it. Ask it, from the project root:
+
+> Read https://raw.githubusercontent.com/AlexandruCalinica/djournal/main/.agents/skills/journal-setup/SKILL.md and follow it to install djournal in this project.
+
+Then use your coding agent normally. Once installed, the bundled
+`journal-setup` skill also handles settings, sharing, CLI updates, and project
+upgrades: ask your agent, for example, “share this work item with the team” or
+“upgrade djournal”.
 
 Install creates a local project marker (`.djournal.json`) and a canonical
 per-project store under `~/.djournal/projects/<project-key>/`:

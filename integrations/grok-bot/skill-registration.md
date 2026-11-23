@@ -26,6 +26,7 @@ path, owner name, or agent id.
 | `journal-reinforce` | `journal-reinforce` |
 | `journal-audit` | `journal-audit` |
 | `journal-reconcile` | `journal-reconcile` |
+| `journal-setup` | `journal-setup` |
 
 Hub-only prose in this recipe is not an upstream skill:
 

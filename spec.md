@@ -55,6 +55,7 @@ project/
 │       ├── journal-research-codebase/
 │       ├── journal-research-web/
 │       ├── journal-resume/
+│       ├── journal-setup/
 │       └── journal-switch/
 └── .journal/
     ├── state.json
