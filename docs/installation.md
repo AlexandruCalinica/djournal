@@ -140,6 +140,31 @@ opened directly, so saving edits changes the journal; use your editor's read-onl
 flag if desired. The wizard does not rewrite entry metadata. If an editor cannot
 start or exits unsuccessfully, the picker remains available for retry or Escape.
 
+## Install with your coding agent
+
+Any coding agent that can read a URL and run shell commands can install
+djournal for you. From the project root, ask it:
+
+> Read https://raw.githubusercontent.com/AlexandruCalinica/djournal/main/.agents/skills/journal-setup/SKILL.md and follow it to install djournal in this project.
+
+The `journal-setup` skill has the agent check for the CLI, ask before a global
+npm install, pick the integration for the agent you are using (or
+instructions-only for other agents), preview with `--dry-run`, install, run
+`djournal doctor`, and tell you which restart or trust step remains. It never
+opens the interactive wizard, which needs a terminal.
+
+After installation the same skill ships in `.agents/skills/journal-setup/`.
+Use it, or `/journal-setup` in Claude Code and `$journal-setup` in Codex, to:
+
+- add or remove an agent integration;
+- change sync, sharing, or update-notification settings (`djournal config`);
+- share, sync, or pull work items;
+- check for a newer CLI, update it, and run `djournal upgrade`;
+- diagnose `djournal doctor` failures, or uninstall.
+
+The skill confirms before global installs, sharing, pushes, and uninstall, and
+reports asset conflicts instead of overwriting your files.
+
 ## No global install
 
 Use `npx` when you want a one-off install without adding a global command:
@@ -314,6 +339,7 @@ match across `.agents/skills/`, Claude's project copies, and Grok registration.
 | `audit` | `journal-audit` |
 | `reconcile` | `journal-reconcile` |
 | `journal-workflow` | `journal-workflow` (unchanged) |
+| — | `journal-setup` (new: install and maintain djournal) |
 
 In Claude, invoke `/journal-resume`, `/journal-recall`, or `/journal-plan`
 directly. In Codex, use `$journal-resume`, `$journal-recall`, or `$journal-plan`.

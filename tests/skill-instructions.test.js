@@ -38,7 +38,7 @@ test("recall reinforcement is workflow-owned and recall remains read-only", () =
 test("journal catalog has matching names and folders with automatic invocation available", () => {
   const directory = path.join(root, ".agents/skills");
   const names = fs.readdirSync(directory).filter((name) => fs.statSync(path.join(directory, name)).isDirectory());
-  assert.equal(names.length, 14);
+  assert.equal(names.length, 15);
   for (const name of names) {
     assert.match(name, /^journal-[a-z0-9-]+$/);
     const text = read(`.agents/skills/${name}/SKILL.md`);
@@ -84,6 +84,21 @@ test("closed marker instructions use the canonical logical journal path", () => 
   assert.match(agents, /global-store projects, hooks resolve that prefix through/);
   assert.match(workflow, /Always emit the logical repository-relative `\.journal\/\.\.\.` path/);
   assert.match(contract, /checker may accept journal-root-relative `work\/\.\.\.` as a compatibility form/);
+});
+
+test("journal-setup drives the CLI non-interactively and confirms outward actions", () => {
+  const setup = read(".agents/skills/journal-setup/SKILL.md");
+  assert.match(setup, /Never run bare `djournal`, `journal`, or `djournal setup`/);
+  assert.match(setup, /djournal install --harness <list> --yes --dry-run/);
+  assert.match(setup, /Never hand-edit `\.djournal\.json`/);
+  assert.match(setup, /Ask before global or outward-facing actions/);
+  for (const command of ["djournal config", "djournal share --work", "djournal sync --work", "djournal pull",
+    "djournal update check", "npm install -g djournal@latest", "djournal upgrade", "djournal doctor", "djournal uninstall"]) {
+    assert.ok(setup.includes(command), `journal-setup is missing ${command}`);
+  }
+  for (const key of ["sync.enabled", "sync.mode", "sync.path", "sync.auto", "updates.enabled", "updates.intervalHours"]) {
+    assert.ok(setup.includes(`\`${key}\``), `journal-setup is missing config key ${key}`);
+  }
 });
 
 test("work initialization and switching pull before enumerating canonical work", () => {

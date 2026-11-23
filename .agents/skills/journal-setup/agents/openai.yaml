@@ -1,0 +1,4 @@
+interface:
+  display_name: "Journal Setup"
+  short_description: "Install, configure, share, update, or upgrade djournal"
+  default_prompt: "Use $journal-setup to install djournal in this project or change its djournal settings."
