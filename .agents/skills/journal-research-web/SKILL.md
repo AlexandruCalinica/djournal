@@ -33,9 +33,9 @@ memory for browsing and do not fabricate URLs.
 
 ## Create the supporting entry
 
-1. Select the next daily sequence in `_research/`.
-2. Generate an `ent_` UUIDv7, resolve identity, and capture one UTC timestamp.
-3. Write `_research/YYYY-MM-DD-NN-web-<topic>.md` with:
+1. Create the file with `djournal entry new --work <slug> --type research --title "<title>" --summary "<summary>" --name web-<topic>`.
+   Edit that store path only. Do not write into a sync checkout.
+2. Confirm the created frontmatter has:
    - exact entry frontmatter from `METADATA.md`
    - `entryType: research`
    - no `entryNumber`

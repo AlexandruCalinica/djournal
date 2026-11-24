@@ -24,12 +24,15 @@ work item:
 
 ```bash
 djournal work list --active
-djournal work bind 2026-08-14-01-example --session "$DJOURNAL_SESSION_ID"
+djournal work bind 2026-08-14-01-example
 ```
 
-If no session id is available, the agent should ask which active work item to
-use and avoid guessing from recency. The global `state.json` selection remains a
-fallback for older workflows.
+`work bind` reads `--session`, then `DJOURNAL_SESSION_ID`, `AGENT_SESSION_ID`,
+and `CURSOR_CONVERSATION_ID`. On a machine shared by several agents, set
+`DJOURNAL_SESSION_ID` to a stable id for this agent. The global `state.json`
+selection is shared by every agent under the user account, so it is only a
+fallback when no session id is available. Create entries with
+`djournal entry new` so they are written in the canonical store.
 
 When standalone automatic sync is enabled, session startup first pulls the
 Git-backed journal and reconciles it into canonical storage. Work initialization

@@ -879,7 +879,7 @@ test("status distinguishes CLI, project assets, and cached npm availability", as
   const cacheFile = path.join(root, "cache/update-check.json");
   await install({ sourceRoot, target: root, instructionsOnly: true, interactive: false });
   writeCache({
-    checkedAt: "2026-07-28T12:00:00.000Z",
+    checkedAt: new Date().toISOString(),
     latestVersion: newerVersion,
     distTag: "latest",
   }, { cacheFile });
@@ -899,6 +899,16 @@ test("status distinguishes CLI, project assets, and cached npm availability", as
   assert.equal(staleAssets.toolVersion, olderVersion);
   assert.equal(staleAssets.projectVersion, olderVersion);
   assert.equal(staleAssets.projectUpdateAvailable, true);
+
+  writeCache({
+    checkedAt: "2020-01-01T00:00:00.000Z",
+    latestVersion: newerVersion,
+    distTag: "latest",
+  }, { cacheFile });
+  const staleCheck = status({ target: root, sourceRoot, cacheFile, env: {}, allowTest: true, now: new Date("2026-11-24T00:00:00.000Z") });
+  assert.equal(staleCheck.updateCheckStale, true);
+  assert.equal(staleCheck.latestVersion, null);
+  assert.equal(staleCheck.updateAvailable, false);
 });
 
 test("upgrade and uninstall preserve user edits outside managed instruction blocks", async () => {

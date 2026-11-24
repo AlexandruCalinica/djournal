@@ -86,6 +86,16 @@ the coverage limitation. Follow the existing decision workflow for an accepted
 intentional replacement; hooks do not decide contradictions or write entries.
 Pass materially used entries to the closing journal skill for typed citations.
 
+## Store and session
+
+Resolve the journal root with `STATE.md`. Do not write into a sync checkout.
+Create work items and entries with `djournal work new` and `djournal entry new`.
+On a machine shared by several agents, bind with `djournal work bind` using the
+session id from `STATE.md`. Pass `--work <slug>` when no session id is
+available. Do not switch the shared global fallback for one agent.
+`sync.auto` runs only from harness hooks. A runtime without those hooks runs
+`djournal sync --work <slug>` itself after closing a shared entry.
+
 ## Run checkpoints
 
 1. **Start:** use `journal-resume` when active-work history can affect the task. Use

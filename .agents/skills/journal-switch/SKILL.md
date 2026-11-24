@@ -6,8 +6,11 @@ description: Change the active filesystem journal work item without changing Git
 # Switch active work
 
 Switch the global fallback journal context only. Work items are projects and are
-not Git branches. For parallel sessions, prefer binding the session with
-`djournal work bind <slug> --session <id>` when a session id is available.
+not Git branches. `state.json` is shared by every agent under this user
+account. For one agent's context, bind with `djournal work bind <slug>` (the
+CLI resolves the session id as described in `STATE.md`) and do not change the
+shared fallback. Use this skill only when the user wants that shared fallback
+to change.
 
 ## Procedure
 

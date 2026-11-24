@@ -57,6 +57,8 @@ test("labeled legacy extraction recognizes supported literals and rejects comman
   const actual = extractReferences({}, body, warnings, "entry.md").references;
   const expected = ["lib/one.js", "README.md", "docs/My Guide.md", "lib/two.js", "lib/three.js", "lib/component", "docs/Other Guide.md"];
   assert.deepEqual(actual.map(r => r.path), expected);
+  const http = extractReferences({}, "Send `POST /` and `POST /v1/orders` from `lib/server.js`.", [], "entry.md").references.map((ref) => ref.path);
+  assert.deepEqual(http, ["lib/server.js"]);
   assert.equal(actual.find(r => r.path === "lib/component").kind, "directory");
   assert.equal(actual[0].bodyLine, 2);
   assert.equal(actual[0].repository, "");
@@ -102,12 +104,19 @@ test("warm refresh updates and deletes postings, version incompatibility and inv
   assert.equal(added.cache.status, "refreshed");
   assert.deepEqual(ids(added), ["added"]);
   const snapshotFile = cachePaths(f.context).snapshot;
-  for (const corrupt of [s => { s.extractorVersion = -1; }, s => { s.pathIndex.files = {}; }, s => { s.schemaVersion = 1; }, s => { s.documents["entry:entry"].codeReferences[0].path = null; }]) {
+  for (const corrupt of [s => { s.extractorVersion = -1; }, s => { s.pathIndex.files = {}; }, s => { s.schemaVersion = 1; }]) {
     const snapshot = JSON.parse(fs.readFileSync(snapshotFile));
     corrupt(snapshot);
     fs.writeFileSync(snapshotFile, JSON.stringify(snapshot));
     assert.equal(f.query(["src/longer-new.js"]).cache.status, "rebuilt");
   }
+  const tolerantSnapshot = JSON.parse(fs.readFileSync(snapshotFile));
+  tolerantSnapshot.documents["entry:entry"].codeReferences.push({ path: "POST ", kind: "directory", repository: "", relation: "mentions", provenance: "inline_code", bodyLine: 1, excerpt: "`POST /`" });
+  fs.writeFileSync(snapshotFile, JSON.stringify(tolerantSnapshot));
+  const tolerant = f.query(["src/longer-new.js"]);
+  assert.equal(tolerant.cache.status, "hit");
+  assert.ok(tolerant.warnings.some((warning) => warning.code === "RECALL_REFERENCE_DROPPED"));
+  assert.ok(ids(tolerant).includes("entry"));
   fs.unlinkSync(file);
   assert.deepEqual(ids(f.query(["src/longer-new.js"])), []);
 });

@@ -33,9 +33,9 @@ Distill and connect evidence; do not concatenate source material.
 
 ## Create the supporting entry
 
-1. Select the next daily sequence in `docs/`.
-2. Generate an `ent_` UUIDv7, resolve identity, and capture one UTC timestamp.
-3. Write `docs/YYYY-MM-DD-NN-<topic>.md` with:
+1. Create the file with `djournal entry new --work <slug> --type doc --title "<title>" --summary "<summary>" --name <topic>`.
+   Edit that store path only. Do not write into a sync checkout.
+2. Confirm the created frontmatter has:
    - exact entry frontmatter from `METADATA.md`
    - `entryType: doc`
    - no `entryNumber`

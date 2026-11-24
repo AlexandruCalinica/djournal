@@ -66,8 +66,15 @@ the shared work items copied out of the global store.
 ```text
 <projection-target>/
   .journal/
+    .djournal-projection.json   # local pointer back to the project and store
     work/<shared-work-item>/
 ```
+
+The projection marker is machine-local. Sync excludes it from the journal git
+path and records it in `.git/info/exclude`. Commands started inside the
+checkout follow the marker back to the canonical store instead of treating the
+checkout's `.journal` as the journal. `djournal pull --dry-run` fetches remote
+refs before it reports what would change.
 
 ## Work items
 
@@ -85,9 +92,11 @@ and timestamps. Several work items may have lifecycle `status: active` at the
 same time.
 
 `state.json` stores the global fallback selected work item for backward
-compatibility. Parallel sessions can bind to a different active work item using
-local operational state under `sessions/`; those bindings are not durable
-journal history and are not projected into shared `.journal/` content.
+compatibility. That file is shared by every agent under the same user account.
+Parallel sessions bind a different active work item with `djournal work bind`.
+The CLI reads `--session`, then `DJOURNAL_SESSION_ID`, `AGENT_SESSION_ID`, and
+`CURSOR_CONVERSATION_ID`. Those bindings live under `sessions/`; they are not
+durable journal history and are not projected into shared `.journal/` content.
 
 ## Configuration
 
