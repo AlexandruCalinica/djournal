@@ -45,8 +45,10 @@ Hub-only prose in this recipe is not an upstream skill:
 4. Rewrite the body into the UpdateSkill payload:
    - Point rule reads at `<project-root>/.agents/rules/...`. Journal root
      resolution stays the procedure in `<project-root>/.agents/rules/STATE.md`:
-     use `.djournal.json` in the project root when it exists, otherwise the
-     project-local `.journal`.
+     use `.djournal.json` when it exists, and treat
+     `.journal/.djournal-projection.json` as a sync checkout that points back
+     at the store. Do not tell the agent to use a project-local `.journal`
+     inside that checkout.
    - Write CLI examples as `djournal <command> --target <project-root>` or
      `journal <command> --target <project-root>`. Replace `<project-root>` with
      the confirmed install target at registration time.

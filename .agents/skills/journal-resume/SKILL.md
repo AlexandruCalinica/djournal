@@ -29,9 +29,13 @@ already loaded for this task when it is still current.
      before loading any work item's context. You may mark one candidate as the
      likely match (for example by current branch or most recent entry), but do
      not present a guessed item as where the user left off. After the user
-     chooses, bind the session with
-     `djournal work bind <slug> --session <id>` when a session id is available,
-     or use `journal-switch` only when the user wants to change the global fallback.
+     chooses, bind with `djournal work bind <slug>`. The CLI reads `--session`,
+     then `DJOURNAL_SESSION_ID`, `AGENT_SESSION_ID`, and
+     `CURSOR_CONVERSATION_ID`. On a machine shared by several agents, export
+     `DJOURNAL_SESSION_ID` as a stable id for this agent before binding.
+     `state.json` is shared by every agent under the user account. Use
+     `journal-switch` only when the user wants to change that shared fallback,
+     and pass `--work <slug>` when this agent has no session id.
 3. If `work.md` is legacy/missing, infer a temporary title/slug and clearly mark
    metadata as incomplete. Do not repair it.
 4. Index entry frontmatter under `journal/`, `_research/`, `docs/`, and

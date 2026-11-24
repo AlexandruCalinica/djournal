@@ -64,7 +64,15 @@ function workMetadata(root, slug) {
 }
 
 function sessionId(payload, env = process.env) {
-  return payload.session_id || payload.sessionId || env.DJOURNAL_SESSION_ID || "";
+  const candidates = [
+    payload.session_id,
+    payload.sessionId,
+    env.DJOURNAL_SESSION_ID,
+    env.AGENT_SESSION_ID,
+    env.CURSOR_CONVERSATION_ID,
+  ];
+  const found = candidates.find((value) => typeof value === "string" && value.trim());
+  return found ? found.trim() : "";
 }
 
 function sessionBinding(context, id) {

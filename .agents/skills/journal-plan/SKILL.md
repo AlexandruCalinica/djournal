@@ -48,19 +48,20 @@ work already exists.
 
 ## Create the entry
 
-1. Select the next daily filename sequence in `journal/`.
-2. Select the next best-effort spine `entryNumber`. Preserve existing gaps,
-   forks, and duplicates; never renumber history.
-3. Generate an `ent_` UUIDv7, resolve identity, and capture one UTC timestamp.
-4. Write `journal/YYYY-MM-DD-NN-plan-<topic>.md` with:
+1. Create the file with `djournal entry new --work <slug> --type plan --title "<title>" --summary "<summary>" --name plan-<topic>`.
+   It writes only in the canonical store, uses an `ent_` UUIDv7, and allocates
+   a free `YYYY-MM-DD-NN` name. Edit that file. Do not hand-write another copy
+   or write into a sync checkout. Preserve existing entry-number gaps; never
+   renumber history.
+2. Confirm the created frontmatter has:
    - exact entry frontmatter from `METADATA.md`
    - `entryType: plan`
    - `source: manual`
    - a useful one- or two-sentence `summary`
    - identical `createdAt` and `updatedAt`
-5. Add outgoing `references` links for research/docs actually used. Each link
+3. Add outgoing `references` links for research/docs actually used. Each link
    must satisfy `LINKS.md`; do not link merely because a file exists.
-6. Use this body:
+4. Use this body:
 
    ```markdown
    # Entry <N>: Plan - <Title>

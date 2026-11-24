@@ -34,14 +34,43 @@ installation finishes.
 
 ## 1. Inspect
 
-1. Resolve the project root: `git rev-parse --show-toplevel`, or the current
-   directory outside Git. Confirm with the user when the agent runs from a
-   workspace above several repositories (see standalone mode below).
-2. Check the CLI: `djournal update check --json` (or `npx djournal update check
+1. Resolve the project root from the directory that should contain
+   `.djournal.json`, and pass it as `--target`. Use `git rev-parse
+   --show-toplevel` only when that directory is the git root of a single
+   project. Do not use it when the agent was given a fixed install root, when
+   the workspace contains several repositories, or when the current directory
+   is inside a nested product repository. Never install djournal into a nested
+   repository just because it is the git toplevel of the current folder.
+2. If the current directory has `.journal/.djournal-projection.json`, or
+   `djournal status --json` reports a `projectionRedirect`, this is a sync
+   checkout. Use the marker's `projectRoot` as `--target`. Do not install or
+   write journal files here.
+3. Check the CLI: `djournal update check --json` (or `npx djournal update check
    --json` when `djournal` is not on PATH). Node.js 18 or newer is required.
-3. When `.djournal.json` exists in the project root, the project is installed.
+4. When `.djournal.json` exists in the project root, the project is installed.
    Run `djournal status --json` and `djournal doctor --json` and use their
    output to choose the route below.
+
+## Shared and agent machines
+
+On a machine where several agents share one user account:
+
+- `npm install -g`, `djournal upgrade`, `djournal config`, and `djournal
+  uninstall` change the CLI, project, or store seen by every agent. Say that
+  before asking to run them, and wait for approval.
+- Keep the install root fixed. Pass `--target <project-root>` on every
+  command. Do not rediscover it with `git rev-parse` from whatever repository
+  the agent happens to be in.
+- Do not restart the agent for runtimes that load skills by reading files or
+  by registration. Restart only the harnesses that load hooks when the process
+  starts (Claude Code, Codex, and Pi, as listed in Install).
+- `sync.auto` runs only from those hooks after a closed journal entry. A
+  runtime without those hooks never syncs by itself. After closing a shared
+  entry, run `djournal sync --work <slug>`.
+- Bind each agent to its own work item. Set `DJOURNAL_SESSION_ID` to a stable
+  id for this agent, then `djournal work bind <slug>`. The CLI also reads
+  `AGENT_SESSION_ID` and `CURSOR_CONVERSATION_ID`. Do not change the shared
+  `state.json` fallback for one agent.
 
 ## 2. Route the request
 
@@ -109,7 +138,7 @@ djournal config <key> <value>
 | `sync.enabled` | `true`, `false` | Share selected work through Git |
 | `sync.mode` | `colocated`, `standalone` | Same repository as the code, or a separate journal repository |
 | `sync.path` | path | Root of the Git projection, usually `.` |
-| `sync.auto` | `true`, `false` | Standalone only: hooks sync shared work after each closed journal entry |
+| `sync.auto` | `true`, `false` | Standalone only. Harness hooks sync shared work after a closed journal entry. Runtimes without those hooks do not run it; run `djournal sync --work <slug>` after closing a shared entry |
 | `updates.enabled` | `true`, `false` | Session notices about newer releases |
 | `updates.intervalHours` | number | How often the release check refreshes |
 
@@ -147,8 +176,15 @@ pushes (standalone).
 4. Report any `.gitignore` warning from `share`; the user decides whether to
    change ignore rules.
 5. To receive teammates' shared work, run `djournal pull` (add `--work <slug>`
-   to limit it). Stop and report any conflict; never resolve journal conflicts
-   by discarding either side.
+   to limit it). `djournal pull --dry-run` fetches remote refs first and
+   reports how far ahead the remote journal is; it does not merge. Stop and
+   report any conflict; never resolve journal conflicts by discarding either
+   side. A `SYNC_CONFLICT` that names a file in the checkout means that file
+   is in the sync checkout, not the canonical store. If the message offers
+   `--adopt`, preview it before using it: adoption copies a checkout-only
+   journal file into the store when the store has no copy, and removes an
+   untracked checkout duplicate that already matches the store. It does not
+   overwrite a store file that differs.
 6. In colocated mode, remind the user that the projected files are committed
    with their normal Git workflow.
 
@@ -171,8 +207,10 @@ djournal has two layers that update separately:
    A locally modified managed file produces an `ASSET_CONFLICT` and stays
    intact: show the file to the user and let them choose between keeping their
    edits and restoring the managed copy before rerunning.
-3. Restart the agent so the new hooks and skills load, then run `djournal
-   doctor`. Grok Bot users re-register changed skills.
+3. Restart only harnesses that load hooks at process start, then run
+   `djournal doctor`. Runtimes that register or read skills directly do not
+   need a process restart; reload or re-register the changed skills. On a
+   shared machine, say that this upgrade changes the skills every agent loads.
 
 ## Diagnose
 

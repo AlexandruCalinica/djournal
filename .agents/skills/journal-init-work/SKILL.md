@@ -21,42 +21,25 @@ Create one project-level work item. Work items may span repositories.
    project is unambiguous.
 4. Resolve the journal root according to `STATE.md`. List `<journal-root>/work/`
    when it exists. Reject an equivalent existing work item instead of creating a
-   duplicate.
-5. Build the folder slug as `YYYY-MM-DD-NN-kebab-case-name` using the current UTC
-   date and next unused daily sequence.
-6. Resolve `createdBy`, generate a `wi_` UUIDv7, and capture one canonical UTC
-   timestamp according to `METADATA.md`.
-7. Create:
+   duplicate. If this directory is a sync checkout, stop and use the project
+   root from the projection marker.
+5. Create the work item in the canonical store:
 
-   ```text
-   <journal-root>/work/<slug>/
-   ├── work.md
-   ├── journal/
-   ├── _research/
-   ├── docs/
-   └── decisions/
+   ```bash
+   djournal work new --title "<title>" --name <kebab-case-name> --description "<objective>"
    ```
 
-8. Write `work.md` with the exact work-item frontmatter contract. Use:
-   - `status: active`
-   - `visibility: local_only`
-   - identical `createdAt` and `updatedAt`
-   - a concise title and description
-9. Add a short body:
-
-   ```markdown
-   # <Title>
-
-   ## Objective
-
-   <What outcome this work item exists to achieve.>
-   ```
-
-10. Create or update `<journal-root>/state.json` to select the new slug as the
-    global fallback work item. Preserve the exact state shape from `STATE.md`
-    and make the update safely.
-11. Re-read `work.md` and state. Verify slug, IDs, directories, timestamps,
-    status, visibility, and JSON validity.
+   The command creates `<journal-root>/work/<slug>/` with `work.md` and the
+   `journal/`, `_research/`, `docs/`, and `decisions/` directories. It uses the
+   next free `YYYY-MM-DD-NN` slug, a `wi_` UUIDv7, `status: active`, and
+   `visibility: local_only`. When a session id is available (see `STATE.md`),
+   it binds that session and does not change the shared `state.json`. Without
+   a session id it updates the shared fallback and warns. On a machine with
+   several agents, set `DJOURNAL_SESSION_ID` first so the new item is not
+   selected for every agent.
+6. Re-read `work.md` and the selection. Verify slug, IDs, directories,
+   timestamps, status, visibility, and that the file is under the store from
+   `djournal status --json`, not under a sync checkout.
 
 ## Constraints
 

@@ -28,9 +28,9 @@ option, or rationale is unclear, ask for the missing information before writing.
    - chosen option
    - rationale and tradeoffs
    - consequences and follow-up
-2. Select the next daily sequence in `decisions/`.
-3. Generate an `ent_` UUIDv7, resolve identity, and capture one UTC timestamp.
-4. Write `decisions/YYYY-MM-DD-NN-decision-<topic>.md` with:
+2. Create the file with `djournal entry new --work <slug> --type decision --title "<title>" --summary "<summary>" --name decision-<topic>`.
+   Edit that store path only. Do not write into a sync checkout.
+3. Confirm the created frontmatter has:
    - exact entry frontmatter from `METADATA.md`
    - `entryType: decision`
    - no `entryNumber`

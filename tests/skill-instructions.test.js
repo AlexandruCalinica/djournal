@@ -111,6 +111,25 @@ test("work initialization and switching pull before enumerating canonical work",
   }
 });
 
+test("shared agents get a store path, a session id, and an entry command", () => {
+  const state = read(".agents/rules/STATE.md");
+  const setup = read(".agents/skills/journal-setup/SKILL.md");
+  const entry = read(".agents/skills/journal-entry/SKILL.md");
+  const init = read(".agents/skills/journal-init-work/SKILL.md");
+  const resume = read(".agents/skills/journal-resume/SKILL.md");
+  assert.match(state, /\.djournal-projection\.json/);
+  assert.match(state, /DJOURNAL_SESSION_ID/);
+  assert.match(state, /djournal entry new/);
+  assert.match(setup, /several agents share one user account/);
+  assert.match(setup, /npm install -g/);
+  assert.match(setup, /Runtimes without those hooks do not run it/);
+  assert.match(setup, /Do not use it when the agent was given a fixed install root/);
+  assert.match(entry, /djournal entry new/);
+  assert.match(init, /djournal work new/);
+  assert.match(resume, /DJOURNAL_SESSION_ID/);
+  assert.match(resume, /state\.json` is shared by every agent/);
+});
+
 test("resume asks for a work item before loading context when several are active", () => {
   const resume = read(".agents/skills/journal-resume/SKILL.md");
   assert.match(resume, /ask the user to choose one\s+before loading any work item's context/);

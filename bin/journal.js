@@ -9,6 +9,8 @@ const {
   checkUpdates,
   bindWork,
   configure,
+  createJournalEntry,
+  createWork,
   doctor,
   install,
   listWork,
@@ -18,6 +20,7 @@ const {
   status,
   uninstall,
   upgrade,
+  validateEntries,
 } = require("../lib/installer/index.js");
 const { buildRecallIndex, searchRecall, lookupFiles } = require("../lib/recall/index.js");
 
@@ -35,22 +38,28 @@ function usage() {
   journal doctor [--target DIR] [--json]
   journal config [--target DIR] [KEY [VALUE]] [--dry-run] [--json]
   journal share [--target DIR] [--work SLUG | --all] [--dry-run] [--json]
-  journal pull [--target DIR] [--work SLUG] [--dry-run] [--json]
-  journal sync [--target DIR] [--work SLUG] [--dry-run] [--json]
+  journal pull [--target DIR] [--work SLUG] [--adopt] [--dry-run] [--json]
+  journal sync [--target DIR] [--work SLUG] [--adopt] [--dry-run] [--json]
   journal work list [--target DIR] [--active] [--json]
+  journal work new --title TEXT [--name SLUG] [--description TEXT] [--dry-run] [--json]
   journal work bind SLUG [--target DIR] [--session ID] [--dry-run] [--json]
+  journal entry new --type TYPE --title TEXT --summary TEXT [--work SLUG] [--name SLUG] [--dry-run] [--json]
+  journal entry validate [--work SLUG] [--json]
   journal recall files PATH... [--target DIR] [--repository LABEL] [--work SLUG] [--limit N] [--no-cache] [--json]
   journal recall index [--target DIR] [--rebuild] [--no-cache] [--json]
   journal recall search QUERY [--target DIR] [--work SLUG] [--type LIST] [--kind LIST] [--status LIST] [--visibility LIST] [--limit N] [--no-cache] [--json]
   journal update check [--target DIR] [--json]
 
 Options:
+  --version, -v         Print the CLI version
   --dry-run             Show the planned operation without writing
   --yes                 Disable interactive harness selection
   --json                Emit JSON
+  --adopt               On pull/sync, copy checkout-only journal files into the store when the store has no copy, and drop untracked checkout duplicates that match the store
   --repository LABEL    Scope code-path evidence to a repository label (files only)
   --work SLUG           Select a journal work item instead of active state
-  --session ID          Bind a journal work item to a specific session
+  --session ID          Bind a journal work item to a specific session.
+                        Otherwise the CLI reads DJOURNAL_SESSION_ID, AGENT_SESSION_ID, then CURSOR_CONVERSATION_ID
   --active              Show only lifecycle-active work items for work list
   --type LIST           Filter recall entries by comma-separated entry types
   --kind LIST           Filter recall results by comma-separated work,entry kinds
@@ -69,7 +78,10 @@ function parseArgs(argv) {
   const args = [...argv];
   const command = args.length ? args.shift() : "setup";
   if (["--help", "-h"].includes(command)) throw new InstallerError(usage(), "HELP");
-  if (!["setup", "install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update", "work", "recall"].includes(command)) {
+  if (["--version", "-v"].includes(command)) {
+    return { command: "version", json: args.includes("--json"), sourceRoot };
+  }
+  if (!["setup", "install", "upgrade", "uninstall", "status", "doctor", "config", "share", "pull", "sync", "update", "work", "entry", "recall"].includes(command)) {
     throw new InstallerError(usage(), "USAGE");
   }
   const options = { command, harnesses: [] };
@@ -78,11 +90,14 @@ function parseArgs(argv) {
     if (options.subcommand !== "check") throw new InstallerError("update requires the check subcommand", "USAGE");
   } else if (command === "work") {
     options.subcommand = args.shift();
-    if (!["list", "bind"].includes(options.subcommand)) throw new InstallerError("work requires the list or bind subcommand", "USAGE");
+    if (!["list", "bind", "new"].includes(options.subcommand)) throw new InstallerError("work requires the list, bind, or new subcommand", "USAGE");
     if (options.subcommand === "bind") {
       if (!args.length || args[0].startsWith("-")) throw new InstallerError("work bind requires a work slug", "USAGE");
       options.work = args.shift();
     }
+  } else if (command === "entry") {
+    options.subcommand = args.shift();
+    if (!["new", "validate"].includes(options.subcommand)) throw new InstallerError("entry requires the new or validate subcommand", "USAGE");
   } else if (command === "recall") {
     options.subcommand = args.shift();
     if (!["index", "search", "files"].includes(options.subcommand)) throw new InstallerError("recall requires the index, search, or files subcommand", "USAGE");
@@ -116,8 +131,14 @@ function parseArgs(argv) {
     } else if (arg.startsWith("--session=")) options.session = arg.slice(10);
     else if (arg === "--type") {
       if (!args.length) throw new InstallerError("--type requires a value", "USAGE");
-      options.type = args.shift();
-    } else if (arg.startsWith("--type=")) options.type = arg.slice(7);
+      const value = args.shift();
+      if (command === "entry") options.entryType = value;
+      else options.type = value;
+    } else if (arg.startsWith("--type=")) {
+      const value = arg.slice(7);
+      if (command === "entry") options.entryType = value;
+      else options.type = value;
+    }
     else if (arg === "--kind") {
       if (!args.length) throw new InstallerError("--kind requires a value", "USAGE");
       options.kind = args.shift();
@@ -149,6 +170,24 @@ function parseArgs(argv) {
     else if (arg === "--no-cache" && command === "recall") options.noCache = true;
     else if (arg === "--passive" && command === "update") options.passive = true;
     else if (arg === "--refresh-cache" && command === "update") options.refreshCache = true;
+    else if (arg === "--adopt") options.adopt = true;
+    else if (arg === "--title") {
+      if (!args.length) throw new InstallerError("--title requires a value", "USAGE");
+      options.title = args.shift();
+    } else if (arg.startsWith("--title=")) options.title = arg.slice(8);
+    else if (arg === "--summary") {
+      if (!args.length) throw new InstallerError("--summary requires a value", "USAGE");
+      options.summary = args.shift();
+    } else if (arg.startsWith("--summary=")) options.summary = arg.slice(10);
+    else if (arg === "--name") {
+      if (!args.length) throw new InstallerError("--name requires a value", "USAGE");
+      options.name = args.shift();
+    } else if (arg.startsWith("--name=")) options.name = arg.slice(7);
+    else if (arg === "--description") {
+      if (!args.length) throw new InstallerError("--description requires a value", "USAGE");
+      options.description = args.shift();
+    } else if (arg.startsWith("--description=")) options.description = arg.slice(14);
+    else if (arg === "--version" || arg === "-v") throw new InstallerError("pass --version as the command", "USAGE");
     else if (arg === "--help" || arg === "-h") throw new InstallerError(usage(), "HELP");
     else if (command === "recall" && options.subcommand === "files" && !arg.startsWith("-")) (options.paths ||= []).push(arg);
     else if (command === "config" && !options.key) options.key = arg;
@@ -157,6 +196,10 @@ function parseArgs(argv) {
   }
   if (options.all && options.harnesses.length) throw new InstallerError("use either --all or --harness", "USAGE");
   if (options.all && options.work) throw new InstallerError("use either --all or --work", "USAGE");
+  if (options.adopt && !["pull", "sync"].includes(command)) throw new InstallerError("--adopt is only supported for pull and sync", "USAGE");
+  if ((options.entryType || options.title || options.summary || options.name || options.description) && !["entry", "work"].includes(command)) {
+    throw new InstallerError("entry fields are only supported for entry and work commands", "USAGE");
+  }
   if (options.all && !["install", "uninstall", "share"].includes(command)) {
     throw new InstallerError(`--all is not supported for ${command}`, "USAGE");
   }
@@ -213,7 +256,25 @@ function print(value, json, output = process.stdout) {
     return;
   }
   if (value.action === "work-bind") {
-    output.write(`bound ${value.work} to session ${value.sessionHash}\n`);
+    output.write(`bound ${value.work} to session ${value.sessionHash} (${value.sessionSource})\n`);
+    return;
+  }
+  if (value.action === "work-new" || value.action === "entry-new") {
+    output.write(`${value.path}\n`);
+    if (value.id) output.write(`id: ${value.id}\n`);
+    if (value.slug) output.write(`slug: ${value.slug}\n`);
+    if (value.journalRoot) output.write(`journal: ${value.journalRoot}\n`);
+    if (value.selectionSource) output.write(`selected: ${value.selectionSource}\n`);
+    if (value.warning) output.write(`warning: ${value.warning}\n`);
+    return;
+  }
+  if (value.action === "entry-validate") {
+    output.write(value.ok ? `ok: ${value.journalRoot}\n` : `${value.issues.length} issues in ${value.journalRoot}\n`);
+    for (const issue of value.issues || []) output.write(`${issue.code} ${issue.path}: ${issue.detail}\n`);
+    return;
+  }
+  if (value.action === "version") {
+    output.write(`${value.version}\n`);
     return;
   }
   if (value.action === "recall-files") {
@@ -248,10 +309,12 @@ function print(value, json, output = process.stdout) {
     for (const item of value.warnings || []) output.write(`warning: ${item.code}${item.path ? ` ${item.path}` : ""}${item.detail ? ` - ${item.detail}` : ""}\n`);
     return;
   }
+  if (value.projectionRedirect) output.write(`sync checkout: ${value.projectionRedirect.from}\nusing project: ${value.target}\n`);
   if (value.action) output.write(`${value.action}: ${value.target}\n`);
   else if (typeof value.installed === "boolean") output.write(value.installed ? `installed: ${value.target}\n` : `not installed: ${value.target}\n`);
   else output.write(`${value.ok ? "ok" : "failed"}: ${value.target}\n`);
   if (value.harnesses) output.write(`harnesses: ${value.harnesses.join(", ") || "instructions-only"}\n`);
+  if (typeof value.changed === "boolean" && value.action === "config") output.write(`changed: ${value.changed}\n`);
   if (value.key) output.write(`${value.key}: ${JSON.stringify(value.value)}\n`);
   else if (value.config) output.write(`${JSON.stringify(value.config, null, 2)}\n`);
   if (value.cliVersion) output.write(`cli version: ${value.cliVersion}\n`);
@@ -275,6 +338,9 @@ function print(value, json, output = process.stdout) {
   }
   if (value.work) output.write(`work: ${value.work}\n`);
   if (value.shared) output.write("marked for sharing\n");
+  if (typeof value.fetched === "boolean") output.write(`fetched: ${value.fetched ? "yes" : "no"}\n`);
+  if (value.fetchError) output.write(`fetch: ${value.fetchError}\n`);
+  if (typeof value.remoteAhead === "number") output.write(`remote ahead: ${value.remoteAhead}\n`);
   if (value.skipped) output.write(`skipped: ${value.reason || "no changes required"}\n`);
   if (value.warning) output.write(`warning: ${value.warning}\n`);
   if (value.conflicts?.length) output.write(`conflicts: ${value.conflicts.join(", ")}\n`);
@@ -322,6 +388,11 @@ function launchUpdateRefresh(options, runner = spawn) {
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
+    if (options.command === "version") {
+      const version = JSON.parse(require("node:fs").readFileSync(require("node:path").join(sourceRoot, "package.json"), "utf8")).version;
+      print({ action: "version", version }, options.json);
+      return;
+    }
     if (options.command === "setup") {
       const { setup } = require("../lib/setup.js");
       const result = await setup(options, { print });
@@ -333,13 +404,36 @@ async function main() {
     if (options.command === "install") result = await install(options);
     else if (options.command === "upgrade") result = await upgrade(options);
     else if (options.command === "uninstall") result = uninstall(options);
-    else if (options.command === "status") result = status(options);
+    else if (options.command === "status") {
+      result = status(options);
+      if (result.updateCheckStale && result.updateChecksEnabled) {
+        try {
+          const refreshed = await checkUpdates(options);
+          result = {
+            ...result,
+            cliVersion: refreshed.cliVersion,
+            projectVersion: refreshed.projectVersion ?? result.projectVersion,
+            latestVersion: refreshed.latestVersion,
+            checkedAt: refreshed.checkedAt,
+            distTag: refreshed.distTag,
+            updateAvailable: refreshed.updateAvailable,
+            projectUpdateAvailable: refreshed.projectUpdateAvailable,
+            updateCheckStale: false,
+          };
+        } catch (error) {
+          result.updateCheckError = error.message;
+        }
+      }
+    }
     else if (options.command === "config") result = configure(options);
     else if (options.command === "share") result = share(options);
     else if (options.command === "pull") result = pull(options);
     else if (options.command === "sync") result = sync(options);
     else if (options.command === "work" && options.subcommand === "list") result = listWork(options);
     else if (options.command === "work" && options.subcommand === "bind") result = bindWork(options);
+    else if (options.command === "work" && options.subcommand === "new") result = createWork(options);
+    else if (options.command === "entry" && options.subcommand === "new") result = createJournalEntry(options);
+    else if (options.command === "entry" && options.subcommand === "validate") result = validateEntries(options);
     else if (options.command === "recall" && options.subcommand === "files") result = lookupFiles(options.paths, options);
     else if (options.command === "recall" && options.subcommand === "index") result = buildRecallIndex(options);
     else if (options.command === "recall" && options.subcommand === "search") result = searchRecall(options.query, options);
@@ -348,6 +442,9 @@ async function main() {
       if (result.refreshNeeded) result.backgroundRefreshStarted = launchUpdateRefresh(options);
     }
     else result = doctor(options);
+    if (options.projectionRedirect && result && typeof result === "object" && !result.projectionRedirect) {
+      result.projectionRedirect = options.projectionRedirect;
+    }
     print(result, options.json);
     if (result.ok === false || result.installed === false || result.clean === false || result.conflicts?.length) process.exitCode = 2;
   } catch (error) {

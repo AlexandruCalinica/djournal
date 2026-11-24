@@ -12,6 +12,21 @@ stays in `~/.djournal/projects/<project-key>/`. Pull hydrates that store from
 the projection; sync pulls first and then copies explicitly shared work back
 into the projection for publication.
 
+`djournal pull --dry-run` and `djournal sync --dry-run` fetch from the remote
+before they report the preview. They do not merge, commit, or push. A
+`SYNC_CONFLICT` names files in the checkout, not in the store. `--adopt` copies
+a checkout-only journal file into the store when the store has no copy, and
+removes an untracked checkout duplicate that already matches the store. It
+does not overwrite a store file that differs.
+
+Pull and sync write `.journal/.djournal-projection.json` in the checkout. It
+points back at the project and the canonical store so commands and agents do
+not treat the checkout as the journal. The file is local to that clone.
+
+`sync.auto` is applied by harness hooks after a closed entry. Agent runtimes
+without those hooks do not sync automatically; run `djournal sync --work <slug>`
+after closing a shared entry.
+
 ## Colocated repository
 
 Use colocated mode when the product repository should carry `.journal/` beside
